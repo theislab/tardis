@@ -131,4 +131,4 @@ dmypy.json
 # Others
 *.DS_Store
 *.pybiomart.sqlite
-# data/*
+data/*
