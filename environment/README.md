@@ -5,7 +5,7 @@ Follow the steps.
 1. Clone the repo.
 
    ```bash
-   git clone https://github.com/theislab/cannot
+   git clone https://github.com/theislab/tardis
    ```
 
 2. Necessary to run beforehand for MAC Silicon:
@@ -27,7 +27,7 @@ Follow the steps.
    > All mamba commands can be replaced by `conda`.
 
    ```bash
-   mamba env create -f environment/cannot_env.yaml  # For M1 Mac. No GPU support.
+   mamba env create -f environment/tardis_env.yaml  # For M1 Mac. No GPU support.
    ```
 
    Currently, whether the GPU version of pytorch is installed depends on which node you install the environment on. That means that if you want to your code to reconnise GPUs when working on a cluster, please make sure you install the conda environments from a node that has access to a GPU. Test whether you installed GPU version using the following
@@ -50,8 +50,11 @@ Follow the steps.
 5. Build the jupter extensions.
 
    ```bash
-   jupyter nbextension enable --py widgetsnbextension
    jupyter lab build
    ```
 
-6. Open `training_demo.ipynb` under `notebooks` directory, and a preprocessing file such as `he2022.ipynb` under `preprocessing` and make sure you can run all of the cells.
+6. Open JupyterLab. Go to the Settings menu at the top. Select 'Settings Editor'.
+   - 'Language Server Protocol' settings:
+     - bla
+   - 'Code Formatter' settings:
+     - make line lenght 120 (or locate flake8 black configs)

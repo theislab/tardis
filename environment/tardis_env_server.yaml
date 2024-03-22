@@ -1,0 +1,129 @@
+# tardis_env Environment
+
+### Silicon Mac [necessary to run beforehand]:
+# brew install openblas
+# brew install pyenv --head
+# export PKG_CONFIG_PATH="/opt/homebrew/opt/openblas/lib/pkgconfig"
+# export LDFLAGS="-L/opt/homebrew/opt/openblas/lib"
+# export CPPFLAGS="-I/opt/homebrew/opt/openblas/include"
+
+### After installation:
+# jupyter lab build
+
+name: tardis_env
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.11
+  - pip
+  - jupyterlab>4.1  # jupyterlab
+  - notebook  # jupyterlab
+  - markdown  # jupyterlab
+  - nodejs  # jupyterlab
+  - jupyterlab_widgets  # jupyterlab
+  - ipywidgets  # jupyterlab
+  - python-lsp-server  # jupyterlab
+  - jupyterlab-lsp  # jupyterlab
+  - jupyterlab_code_formatter  # jupyterlab
+  - isort
+  - black
+  - flake8
+  - pyupgrade
+  - pre-commit-hooks
+  - pre-commit
+  - cython
+  - pandas>=0.20.2,<2.0
+  - numpy>=1.9.2
+  - tqdm
+  - sparse
+  - scipy>=1.11.3
+  - networkx
+  - matplotlib
+  - mscorefonts
+  - seaborn>0.13
+  - dill
+  - memory_profiler
+  - scikit-learn>=1.3.1
+  - scikit-sparse
+  - scikit-plot
+  - scikit-learn-intelex ################################## Commented out for Mac Silicon
+  - cupy ################################## Commented out for Mac Silicon
+  - requests
+  - typing_extensions
+  - pymysql
+  - pytables
+  - pyyaml
+  - ipython
+  - hdf5
+  - h5py
+  - hdbscan
+  - loompy
+  - anytree
+  - igraph
+  - python-igraph
+  - leidenalg
+  - rclone
+  - adjustText
+  - jsonpickle
+  - wandb
+  - numba
+  - polars
+  - gputil
+  - tabulate
+  - upsetplot
+  - python-levenshtein
+  - arrow
+  - pyarrow
+  - pytoml
+  - shapely
+  - colorcet
+  - joblib
+  - statsmodels
+  - cycler
+  - jax
+  - jaxlib
+  - zarr
+  - colorlover
+  - pandas-stubs
+  - types-pyyaml
+  - lightning
+  - pytorch-lightning
+  - torchmetrics
+  - pytorch::pytorch
+  - pytorch::torchvision
+  - pytorch::torchaudio
+  - pytorch::captum
+  - pytorch::pytorch-cuda=11.6 ################################## Commented out for Mac Silicon
+  - nvidia::cudatoolkit=11.7.0 ################################## Commented out for Mac Silicon
+  - nvidia::cuda-nvcc=11.6.124 ################################## Commented out for Mac Silicon
+  - cudnn<=8.5,>=8.0.0 ################################## Commented out for Mac Silicon
+  - scvi-tools=1.1.2
+  - scanpy=1.9.8
+  - anndata=0.10.6
+  - ott-jax
+  - pot
+  - moscot
+  - pip:
+    - seml==0.4.3
+    - scib-metrics==0.5.1
+    - scib==1.1.4
+    - pyitlib==0.2.3
+    - PhenoGraph
+    - louvain
+    # types
+    - types-Send2Trash
+    - types-colorama
+    - types-jsonschema
+    - types-openpyxl
+    - types-psutil
+    - types-python-dateutil
+    - types-requests
+    - types-setuptools
+    - types-six
+    - types-xxhash
+  
+
+variables:
+  SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL: True
