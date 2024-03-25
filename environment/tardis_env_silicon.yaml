@@ -40,8 +40,8 @@ dependencies:
   - scikit-learn==1.4.1.post1
   - scikit-sparse
   - scikit-plot
-  - scikit-learn-intelex # Should be commented out for MAC Silicon
-  - seml # Should be commented out for MAC Silicon
+  # - scikit-learn-intelex # Should be commented out for MAC Silicon
+  # - seml # Should be commented out for MAC Silicon
   - requests
   - typing_extensions
   - pymysql
@@ -88,17 +88,17 @@ dependencies:
   - pytorch::torchvision
   - pytorch::torchaudio
   - pytorch::captum
-  - pytorch::pytorch-cuda=11.8 # Should be commented out for MAC Silicon
-  - cuda-version=11.8 # Should be commented out for MAC Silicon
-  - nvidia::cuda-nvcc # Should be commented out for MAC Silicon
-  - nvidia::cuda-nvrtc # Should be commented out for MAC Silicon
-  - nvidia::cuda-cudart # Should be commented out for MAC Silicon
-  - cudatoolkit # Should be commented out for MAC Silicon
-  - cutensor # Should be commented out for MAC Silicon
-  - cusparselt # Should be commented out for MAC Silicon
-  - rapidsai::rapids=24.02 # Should be commented out for MAC Silicon
-  - cudnn # Should be commented out for MAC Silicon
-  - cupy # Should be commented out for MAC Silicon
+  # - pytorch::pytorch-cuda=11.8 # Should be commented out for MAC Silicon
+  # - cuda-version=11.8 # Should be commented out for MAC Silicon
+  # - nvidia::cuda-nvcc # Should be commented out for MAC Silicon
+  # - nvidia::cuda-nvrtc # Should be commented out for MAC Silicon
+  # - nvidia::cuda-cudart # Should be commented out for MAC Silicon
+  # - cudatoolkit # Should be commented out for MAC Silicon
+  # - cutensor # Should be commented out for MAC Silicon
+  # - cusparselt # Should be commented out for MAC Silicon
+  # - rapidsai::rapids=24.02 # Should be commented out for MAC Silicon
+  # - cudnn # Should be commented out for MAC Silicon
+  # - cupy # Should be commented out for MAC Silicon
   - scvi-tools=1.1.2
   - scanpy=1.9.8
   - anndata=0.10.6
@@ -122,7 +122,7 @@ dependencies:
   - psutil>4  # PhenoGraph dependency
   - pip:
     - PhenoGraph==1.5.7
-    - rapids-singlecell==0.9.6 # Should be commented out for MAC Silicon
+    # - rapids-singlecell==0.9.6 # Should be commented out for MAC Silicon
     - scib-metrics==0.5.1
     - scib==1.1.3
     - louvain==0.8.2
