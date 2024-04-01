@@ -75,7 +75,7 @@ dependencies:
   - joblib
   - statsmodels>=0.12
   - cycler
-  - jax
+  - jax<=0.4.23
   - jaxlib
   - zarr
   - colorlover
