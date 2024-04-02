@@ -107,7 +107,9 @@ class MyModule(BaseModuleClass):
         n_continuous_cov: int = 0,
         n_cats_per_cov: Optional[Iterable[int]] = None,
         dropout_rate: Tunable[float] = 0.1,
-        dispersion: Tunable[Literal["gene", "gene-batch", "gene-label", "gene-cell"]] = "gene",
+        dispersion: Tunable[
+            Literal["gene", "gene-batch", "gene-label", "gene-cell"]
+        ] = "gene",
         log_variational: Tunable[bool] = True,
         gene_likelihood: Tunable[Literal["zinb", "nb", "poisson"]] = "zinb",
         latent_distribution: Tunable[Literal["normal", "ln"]] = "normal",
@@ -143,8 +145,12 @@ class MyModule(BaseModuleClass):
                     "must provide library_log_means and library_log_vars."
                 )
 
-            self.register_buffer("library_log_means", torch.from_numpy(library_log_means).float())
-            self.register_buffer("library_log_vars", torch.from_numpy(library_log_vars).float())
+            self.register_buffer(
+                "library_log_means", torch.from_numpy(library_log_means).float()
+            )
+            self.register_buffer(
+                "library_log_vars", torch.from_numpy(library_log_vars).float()
+            )
 
         if self.dispersion == "gene":
             self.px_r = torch.nn.Parameter(torch.randn(n_input))
@@ -254,7 +260,9 @@ class MyModule(BaseModuleClass):
 
         size_factor_key = REGISTRY_KEYS.SIZE_FACTOR_KEY
         size_factor = (
-            torch.log(tensors[size_factor_key]) if size_factor_key in tensors.keys() else None
+            torch.log(tensors[size_factor_key])
+            if size_factor_key in tensors.keys()
+            else None
         )
 
         input_dict = {
@@ -276,8 +284,12 @@ class MyModule(BaseModuleClass):
         log library sizes in the batch the cell corresponds to.
         """
         n_batch = self.library_log_means.shape[1]
-        local_library_log_means = F.linear(one_hot(batch_index, n_batch), self.library_log_means)
-        local_library_log_vars = F.linear(one_hot(batch_index, n_batch), self.library_log_vars)
+        local_library_log_means = F.linear(
+            one_hot(batch_index, n_batch), self.library_log_means
+        )
+        local_library_log_vars = F.linear(
+            one_hot(batch_index, n_batch), self.library_log_vars
+        )
         return local_library_log_means, local_library_log_vars
 
     @auto_move_data
@@ -310,7 +322,9 @@ class MyModule(BaseModuleClass):
         qz, z = self.z_encoder(encoder_input, batch_index, *categorical_input)
         ql = None
         if not self.use_observed_lib_size:
-            ql, library_encoded = self.l_encoder(encoder_input, batch_index, *categorical_input)
+            ql, library_encoded = self.l_encoder(
+                encoder_input, batch_index, *categorical_input
+            )
             library = library_encoded
 
         if n_samples > 1:
@@ -416,7 +430,9 @@ class MyModule(BaseModuleClass):
     ):
         """Computes the loss function for the model."""
         x = tensors[REGISTRY_KEYS.X_KEY]
-        kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(dim=-1)
+        kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(
+            dim=-1
+        )
         if not self.use_observed_lib_size:
             kl_divergence_l = kl(
                 inference_outputs["ql"],
@@ -438,7 +454,9 @@ class MyModule(BaseModuleClass):
             "kl_divergence_l": kl_divergence_l,
             "kl_divergence_z": kl_divergence_z,
         }
-        return LossOutput(loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_local)
+        return LossOutput(
+            loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_local
+        )
 
     @torch.inference_mode()
     def sample(
@@ -480,7 +498,9 @@ class MyModule(BaseModuleClass):
 
         dist = generative_outputs["px"]
         if self.gene_likelihood == "poisson":
-            dist = torch.distributions.Poisson(torch.clamp(dist.rate, max=max_poisson_rate))
+            dist = torch.distributions.Poisson(
+                torch.clamp(dist.rate, max=max_poisson_rate)
+            )
 
         # (n_obs, n_vars) if n_samples == 1, else (n_samples, n_obs, n_vars)
         samples = dist.sample()
@@ -535,7 +555,9 @@ class MyModule(BaseModuleClass):
 
             # Log-probabilities
             p_z = (
-                Normal(torch.zeros_like(qz.loc), torch.ones_like(qz.scale)).log_prob(z).sum(dim=-1)
+                Normal(torch.zeros_like(qz.loc), torch.ones_like(qz.scale))
+                .log_prob(z)
+                .sum(dim=-1)
             )
             p_x_zl = -reconst_loss
             q_z_x = qz.log_prob(z).sum(dim=-1)
@@ -564,4 +586,3 @@ class MyModule(BaseModuleClass):
         else:
             batch_log_lkl = batch_log_lkl.cpu()
         return batch_log_lkl
-

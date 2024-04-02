@@ -2,5 +2,6 @@
 
 from scvi.train import TrainRunner
 
+
 class MyTrainRunner(TrainRunner):
     pass
