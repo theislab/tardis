@@ -133,4 +133,10 @@ dmypy.json
 *.pybiomart.sqlite
 
 data/*
+<<<<<<< Updated upstream
 !data/.gitkeep
+=======
+
+# Ignore scripts for Aleyna
+scripts/sync_drive_aleyna.sh
+>>>>>>> Stashed changes
