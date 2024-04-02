@@ -1,0 +1,25 @@
+# Config File
+
+absolute_paths:
+  server:
+    home_directory: /home/icb/kemal.inecik
+    storage_directory: /lustre/groups/ml01/workspace/kemal.inecik/tardis_data
+    code_repository: /home/icb/kemal.inecik/work/codes/tardis
+    training_repository: /home/icb/kemal.inecik/work/codes/tardis/training/server
+
+  local:
+    home_directory: /Users/kemalinecik
+    storage_directory: /Users/kemalinecik/git_nosync/tardis/data
+    code_repository: /Users/kemalinecik/git_nosync/tardis
+    training_repository: /Users/kemalinecik/git_nosync/tardis/training/local
+
+io_directories:
+  processed:
+    relative_to: storage_directory
+    path: processed
+  figures:
+    relative_to: storage_directory
+    path: figures
+  models:
+    relative_to: storage_directory
+    path: models

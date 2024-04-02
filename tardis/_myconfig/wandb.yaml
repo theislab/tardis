@@ -1,0 +1,27 @@
+# Config File
+
+wandblogger_kwargs:
+  entity: inecik-academic
+  project: tardis_experimental_runs
+  name: null
+  save_dir:
+    relative_to: training_repository
+    path: ""
+  mode: online
+  tags:
+    - tardis
+    - experimental
+    - development
+  offline: True
+  save_code: False
+  resume: never
+  notes: Development runs for tardis.
+
+environment_variables:
+  WANDB_USERNAME: inecik
+  WANDB_USER_EMAIL: benkemalim@gmail.com
+  WANDB_SILENT: "false"
+
+login_credentials:
+  username: inecik
+  email: benkemalim@gmail.com

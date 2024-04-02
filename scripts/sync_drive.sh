@@ -28,10 +28,10 @@ while true; do
     echo "4. Send Data from Drive to Server"
     echo "5. Sync Repo from Local to Drive"
     echo "q. Exit the script"
-    
+
     # Read the user's choice
     read -p "Enter your choice (1-5): " choice
-    
+
     # Execute the corresponding command based on the user's choice
     case $choice in
         1) rclone sync -v --progress -L "$SERVER_DATA_PATH" "$DRIVE_DATA_PATH" $COMMON_EXCLUDES

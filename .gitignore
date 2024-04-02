@@ -132,11 +132,19 @@ dmypy.json
 *.DS_Store
 *.pybiomart.sqlite
 
-data/*
-<<<<<<< Updated upstream
-!data/.gitkeep
-=======
+# Ignore everything under data/
+data/**/*
+
+# But don't ignore the directories themselves
+!data/processed/
+!data/figures/
+!data/models/
+
+# And don't ignore .gitkeep files anywhere
+!**/.gitkeep
+
+# Ignore wandb outputs as it will be uploaded to wandb server anyway
+training/**/wandb
 
 # Ignore scripts for Aleyna
 scripts/sync_drive_aleyna.sh
->>>>>>> Stashed changes
