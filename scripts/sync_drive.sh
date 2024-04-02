@@ -10,13 +10,13 @@ DRIVE_DATA_PATH="gdrive:/tardis/tardis_data"
 REPO_PATH="/Users/kemalinecik/git_nosync/tardis"
 DRIVE_REPO_PATH="gdrive:/tardis/repo"
 
-# Define common exclude parameters as a string
-COMMON_EXCLUDES="--exclude '__pycache__/**' \
-                --exclude '*.DS_Store' \
-                --exclude '.idea/**' \
-                --exclude '.mypy_cache/**' \
-                --exclude '*.ipynb_checkpoints/**' \
-                --exclude '.git/**'"
+# Define common exclude parameters as an array
+COMMON_EXCLUDES=(--exclude '__pycache__/**' \
+                 --exclude '*.DS_Store' \
+                 --exclude '.idea/**' \
+                 --exclude '.mypy_cache/**' \
+                 --exclude '*.ipynb_checkpoints/**' \
+                 --exclude '.git/**')
 
 # Loop indefinitely until the user chooses to exit
 while true; do
@@ -34,15 +34,15 @@ while true; do
 
     # Execute the corresponding command based on the user's choice
     case $choice in
-        1) rclone sync -v --progress -L "$SERVER_DATA_PATH" "$DRIVE_DATA_PATH" $COMMON_EXCLUDES
+        1) rclone sync -v --progress -L "$SERVER_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}"
            ;;
-        2) rclone sync -v --progress "$LOCAL_DATA_PATH" "$DRIVE_DATA_PATH" $COMMON_EXCLUDES
+        2) rclone sync -v --progress "$LOCAL_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}"
            ;;
-        3) rclone sync -v --progress "$DRIVE_DATA_PATH" "$LOCAL_DATA_PATH" $COMMON_EXCLUDES
+        3) rclone sync -v --progress "$DRIVE_DATA_PATH" "$LOCAL_DATA_PATH" "${COMMON_EXCLUDES[@]}"
            ;;
-        4) rclone sync -v --progress "$DRIVE_DATA_PATH" "$SERVER_DATA_PATH" $COMMON_EXCLUDES
+        4) rclone sync -v --progress "$DRIVE_DATA_PATH" "$SERVER_DATA_PATH" "${COMMON_EXCLUDES[@]}"
            ;;
-        5) rclone sync -v --progress "$REPO_PATH" "$DRIVE_REPO_PATH" $COMMON_EXCLUDES \
+        5) rclone sync -v --progress "$REPO_PATH" "$DRIVE_REPO_PATH" "${COMMON_EXCLUDES[@]}" \
             --exclude '/data/**'
            ;;
         q) echo "Exiting script."
