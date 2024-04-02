@@ -16,4 +16,4 @@ class MyUnsupervisedTrainingMixin(UnsupervisedTrainingMixin):
     _train_runner_cls = MyTrainRunner
 
     def train(self, *args, **kwargs):
-        super.train(*args, **kwargs)
+        super().train(*args, **kwargs)
