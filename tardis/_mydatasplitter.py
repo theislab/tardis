@@ -2,5 +2,6 @@
 
 from scvi.dataloaders import DataSplitter
 
+
 class MyDataSplitter(DataSplitter):
     pass

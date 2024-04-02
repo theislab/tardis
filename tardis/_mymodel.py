@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import logging
-import warnings
 from typing import Literal
 
-import numpy as np
 from anndata import AnnData
 
 from scvi import REGISTRY_KEYS
@@ -90,7 +88,9 @@ class MyModel(
         **kwargs,
     ):
         super().__init__(adata)
-        assert not self._module_init_on_train, "The model currently does not support initialization without data."
+        assert (
+            not self._module_init_on_train
+        ), "The model currently does not support initialization without data."
 
         self._module_kwargs = {
             "n_hidden": n_hidden,
@@ -110,12 +110,16 @@ class MyModel(
         )
 
         n_cats_per_cov = (
-            self.adata_manager.get_state_registry(REGISTRY_KEYS.CAT_COVS_KEY).n_cats_per_key
+            self.adata_manager.get_state_registry(
+                REGISTRY_KEYS.CAT_COVS_KEY
+            ).n_cats_per_key
             if REGISTRY_KEYS.CAT_COVS_KEY in self.adata_manager.data_registry
             else None
         )
         n_batch = self.summary_stats.n_batch
-        use_size_factor_key = REGISTRY_KEYS.SIZE_FACTOR_KEY in self.adata_manager.data_registry
+        use_size_factor_key = (
+            REGISTRY_KEYS.SIZE_FACTOR_KEY in self.adata_manager.data_registry
+        )
         library_log_means, library_log_vars = None, None
         if not use_size_factor_key:
             library_log_means, library_log_vars = _init_library_size(
@@ -159,12 +163,22 @@ class MyModel(
             LayerField(REGISTRY_KEYS.X_KEY, layer, is_count_data=True),
             CategoricalObsField(REGISTRY_KEYS.BATCH_KEY, batch_key),
             CategoricalObsField(REGISTRY_KEYS.LABELS_KEY, labels_key),
-            NumericalObsField(REGISTRY_KEYS.SIZE_FACTOR_KEY, size_factor_key, required=False),
-            CategoricalJointObsField(REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys),
-            NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
+            NumericalObsField(
+                REGISTRY_KEYS.SIZE_FACTOR_KEY, size_factor_key, required=False
+            ),
+            CategoricalJointObsField(
+                REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys
+            ),
+            NumericalJointObsField(
+                REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys
+            ),
         ]
         adata_minify_type = _get_adata_minify_type(adata)
-        assert adata_minify_type is None, "The model currently does not support minified data."
-        adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
+        assert (
+            adata_minify_type is None
+        ), "The model currently does not support minified data."
+        adata_manager = AnnDataManager(
+            fields=anndata_fields, setup_method_args=setup_method_args
+        )
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)

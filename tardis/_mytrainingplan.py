@@ -2,5 +2,6 @@
 
 from scvi.train import TrainingPlan
 
+
 class MyTrainingPlan(TrainingPlan):
     pass

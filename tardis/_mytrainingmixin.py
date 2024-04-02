@@ -9,6 +9,7 @@ from ._mydatasplitter import MyDataSplitter
 from ._mytrainrunner import MyTrainRunner
 from ._mytrainingplan import MyTrainingPlan
 
+
 class MyUnsupervisedTrainingMixin(UnsupervisedTrainingMixin):
 
     _data_splitter_cls = MyDataSplitter
