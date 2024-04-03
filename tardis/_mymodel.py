@@ -21,7 +21,8 @@ from scvi.data.fields import (
 from scvi.model._utils import _init_library_size
 from scvi.model.base import ArchesMixin, BaseModelClass, RNASeqMixin, VAEMixin
 
-from ._myconstant import MODEL_NAME
+from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
+from ._mydatasplitter import CounteractiveMinibatchGenerator
 from ._mymodule import MyModule
 from ._mytrainingmixin import MyUnsupervisedTrainingMixin
 from ._myutils.wandb import check_wandb_configurations
@@ -141,6 +142,24 @@ class MyModel(
 
         self.init_params_ = self._get_init_params(locals())
 
+    @staticmethod
+    def _disentenglement_targets_configurations_processor(disentenglement_targets_configurations: list[dict] | None):
+
+        # TODO:
+
+        # convert it to empty list if it is None
+        if disentenglement_targets_configurations is None:
+            return []
+
+        # assert it is list of dicts, with only keys allowed.
+
+        # configurations in strategy is here for each metadata (including seed)
+        # key is here for each metadata
+
+        # add a new key index of each element
+
+        return disentenglement_targets_configurations  # TODO
+
     @classmethod
     def setup_anndata(
         cls,
@@ -151,9 +170,20 @@ class MyModel(
         size_factor_key: str | None = None,
         categorical_covariate_keys: list[str] | None = None,
         continuous_covariate_keys: list[str] | None = None,
+        disentenglement_targets_configurations: list[dict] | None = None,
         **kwargs,
     ):
         setup_method_args = cls._get_setup_method_args(**locals())
+
+        disentenglement_targets_configurations = MyModel._disentenglement_targets_configurations_processor(
+            disentenglement_targets_configurations=disentenglement_targets_configurations
+        )
+        disentenglement_targets_setup_anndata_keys = (
+            None
+            if len(disentenglement_targets_configurations) == 0
+            else [c["key"] for c in disentenglement_targets_configurations]
+        )
+
         anndata_fields = [
             LayerField(REGISTRY_KEYS.X_KEY, layer, is_count_data=True),
             CategoricalObsField(REGISTRY_KEYS.BATCH_KEY, batch_key),
@@ -161,17 +191,32 @@ class MyModel(
             NumericalObsField(REGISTRY_KEYS.SIZE_FACTOR_KEY, size_factor_key, required=False),
             CategoricalJointObsField(REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys),
             NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
+            CategoricalJointObsField(REGISTRY_KEY_DISENTENGLEMENT_TARGETS, disentenglement_targets_setup_anndata_keys),
         ]
         adata_minify_type = _get_adata_minify_type(adata)
-        assert adata_minify_type is None, "The model currently does not support minified data."
+        assert adata_minify_type is None, f"{MODEL_NAME} model currently does not support minified data."
         adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
 
+        if disentenglement_targets_setup_anndata_keys is not None:
+            CounteractiveMinibatchGenerator.set_disentenglement_targets_configurations(
+                value=disentenglement_targets_configurations
+            )
+            CounteractiveMinibatchGenerator.set_anndata_manager_state_registry(
+                value={
+                    registry_key: adata_manager.registry["field_registries"][registry_key]["state_registry"]
+                    for registry_key in adata_manager.registry["field_registries"]
+                    if registry_key != REGISTRY_KEYS.X_KEY
+                }
+            )
+
     @classmethod
     def setup_wandb(cls, wandb_configurations: dict, hyperparams: dict | None = None, check_credientials: bool = False):
         if hasattr(cls, "wandb_logger"):
-            assert cls.wandb_logger.experiment._is_finished, "Initialization more than one times may cause errors!"
+            assert (
+                cls.wandb_logger.experiment._is_finished
+            ), "Multiple W&B initialization may cause unexpected behaviours!"
 
         # Import necessary libraries
         from pytorch_lightning.loggers import WandbLogger

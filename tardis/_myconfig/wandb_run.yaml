@@ -3,7 +3,7 @@
 wandblogger_kwargs:
   entity: inecik-academic
   project: tardis_experimental_runs
-  name: null  # wandb should assign a random one
+  name: null # wandb should assign a random one
   save_dir:
     relative_to: training_repository
     path: ""
