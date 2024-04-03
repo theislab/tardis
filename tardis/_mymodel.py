@@ -121,6 +121,10 @@ class MyModel(
         library_log_means, library_log_vars = None, None
         if not use_size_factor_key:
             library_log_means, library_log_vars = _init_library_size(self.adata_manager, n_batch)
+
+        # TODO: check total latent space is ok for reserved latent variables
+        # Update the latent indices in CounteractiveMinibatchGenerator..
+
         self.module = self._module_cls(
             n_input=self.summary_stats.n_vars,
             n_batch=n_batch,
@@ -151,12 +155,18 @@ class MyModel(
         if disentenglement_targets_configurations is None:
             return []
 
-        # assert it is list of dicts, with only keys allowed.
-
+        # include `upper_loss`, `lower_loss` boolean choices, and allow setting a loss function for each.
+        
+        # include `indexer_method` choice. for now only `random` implemented.. 
+        
         # configurations in strategy is here for each metadata (including seed)
-        # key is here for each metadata
+
+        # how many latent space will be devoted to this one
 
         # add a new key index of each element
+        # key is here for each metadata
+        
+        # assert it is list of dicts, with only allowed keys.
 
         return disentenglement_targets_configurations  # TODO
 

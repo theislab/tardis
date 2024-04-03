@@ -9,9 +9,12 @@ from ._myconstants import MODEL_NAME
 
 
 class CounteractiveMinibatchGenerator:
+    # TODO: Rename it for a more general use case other than minibatch generation, e.g. latent index
 
     _disentenglement_targets_configurations = list()
     _anndata_manager_state_registry = dict()
+    # TODO: global_step counter
+    # TODO: reserved variable indices
 
     @classmethod
     def set_disentenglement_targets_configurations(cls, value):
@@ -38,10 +41,17 @@ class CounteractiveMinibatchGenerator:
         within_batch: bool,
         seed: int | str = "global_step",
     ):
+        # TODO: rename the function
+        # TODO: write a one main function and subfunctions for this
+
+        # TODO: _disentenglement_targets_configurations has more keys to be put here
+        # directly e.g. key, index, indexer_method (for now it is only random) loss
+        # Find a way to seamlessly use many functions other than random (for now it will
+        # raise Notimplementederror)
         pass
 
 
-class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter, CounteractiveMinibatchGenerator):
+class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
 
     def _next_data(self):
         index = self._next_index()  # may raise StopIteration
@@ -73,10 +83,12 @@ class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter, Counteractive
         # a list of dict saying which strategy to use, and settings in strategy method.
         # it should be created in setup_anndata
 
+        # look _disentenglement_targets_configurations to get with method to choose in CounteractiveMinibatchGenerator..
         # use CounteractiveMinibatchGenerator method to get indexes for each metadata....
 
         # add a key to data: disentenglement_targets.
-        # add a key to data[disentenglement_targets][age/sex etc] = {X: tensor, labels: tensor, batch: tensor...}
+        # add a key to data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][age/sex etc] = \ 
+        # {X: tensor, labels: tensor, batch: tensor...}
         # sanirim bu yuzden, pin_memory'yi de yenilemen gerekiyor, bu yapi icin uygun degil zira.
 
         if self._pin_memory:
