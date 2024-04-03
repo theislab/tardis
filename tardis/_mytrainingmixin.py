@@ -89,3 +89,15 @@ class MyUnsupervisedTrainingMixin(UnsupervisedTrainingMixin):
         finally:
             if hasattr(self, "wandb_logger"):
                 self.wandb_logger.experiment.finish(exit_code=exit_code, quiet=True)
+                wandb_message = (
+                    f"W&B logger finalized with the following parameters: \n"
+                    f"Entity: {self.wandb_logger.experiment.entity}\n"
+                    f"Project: {self.wandb_logger.experiment.project}\n"
+                    f"ID: {self.wandb_logger.experiment.id}\n"
+                    f"Name: {self.wandb_logger.experiment.name}\n"
+                    f"Tags: {', '.join(self.wandb_logger.experiment.tags)}\n"
+                    f"Notes: {self.wandb_logger.experiment.notes}\n"
+                    f"URL: {self.wandb_logger.experiment.url}\n"
+                    f"Directory: {self.wandb_logger.experiment.dir}\n"
+                )
+                print(wandb_message)

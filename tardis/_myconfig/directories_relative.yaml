@@ -1,0 +1,12 @@
+# Config File
+
+io_directories:
+  processed:
+    relative_to: storage_directory
+    path: processed
+  figures:
+    relative_to: storage_directory
+    path: figures
+  models:
+    relative_to: storage_directory
+    path: models

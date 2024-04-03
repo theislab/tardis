@@ -1,1 +1,1 @@
-from .configurer import config_server, config_local  # noqa
+from .configurer import config_local, config_server  # noqa

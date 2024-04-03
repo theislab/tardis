@@ -1,0 +1,10 @@
+# Config File
+
+environment_variables:
+  WANDB_USERNAME: inecik
+  WANDB_USER_EMAIL: benkemalim@gmail.com
+  WANDB_SILENT: "true"
+
+login_credentials:
+  username: inecik
+  email: benkemalim@gmail.com

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
- 
+
 import os
 import sys
 import warnings
@@ -52,26 +52,27 @@ def ignore_predetermined_warnings():
         )
         yield
 
-        
+
 @contextmanager
 def suppress_stdout():
     original_stdout = sys.stdout
-    sys.stdout = open(os.devnull, 'w')
+    sys.stdout = open(os.devnull, "w")
     try:
         yield
     finally:
         sys.stdout.close()
         sys.stdout = original_stdout
 
-        
+
 @contextmanager
 def dumb_contextmanager():
     yield
 
-    
+
 @contextmanager
 def scanpy_temporary_verbosity(level=0):
     import scanpy as sc
+
     # Save the original verbosity level
     original_verbosity = sc.settings.verbosity
     try:

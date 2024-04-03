@@ -10,8 +10,10 @@ import yaml
 class Configurer:
     """Validate and read config files."""
 
-    CONFIG_FILE_DIRECTORIES = "directories.yaml"
-    CONFIG_FILE_WANDB = "wandb.yaml"
+    CONFIG_FILE_DIRECTORIES_RELATIVE = "directories_relative.yaml"
+    CONFIG_FILE_DIRECTORIES_USER = "directories_user.yaml"
+    CONFIG_FILE_WANDB_RUN = "wandb_run.yaml"
+    CONFIG_FILE_WANDB_USER = "wandb_user.yaml"
 
     def __init__(self, where):
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -37,10 +39,11 @@ class Configurer:
         """
         This function reads the YAML file and validates the directory.
         """
-        read_yaml = self.read_config_yaml(Configurer.CONFIG_FILE_DIRECTORIES)
+        read_yaml = self.read_config_yaml(Configurer.CONFIG_FILE_DIRECTORIES_RELATIVE)
+        read_yaml.update(self.read_config_yaml(Configurer.CONFIG_FILE_DIRECTORIES_USER))
 
         if the_key not in read_yaml:
-            error_msg = f"Key '{the_key}' is not found in {Configurer.CONFIG_FILE_DIRECTORIES}"
+            error_msg = f"Key '{the_key}' is not found in directory configurations."
             self.logger.error(error_msg)
             raise KeyError(error_msg)
 
@@ -139,19 +142,20 @@ class Configurer:
         """
         This function validates the wandb configuration.
         """
-        read_yaml = self.read_config_yaml(Configurer.CONFIG_FILE_WANDB)
+        read_yaml = self.read_config_yaml(Configurer.CONFIG_FILE_WANDB_RUN)
+        read_yaml.update(self.read_config_yaml(Configurer.CONFIG_FILE_WANDB_USER))
 
         available_keys = {"wandblogger_kwargs", "environment_variables", "login_credentials"}
 
         for key, _ in read_yaml.items():
             if key not in available_keys:
-                error_msg = f"Unknown key in '{Configurer.CONFIG_FILE_WANDB}': '{key}'"
+                error_msg = f"Unknown key in W&B configurations: '{key}'"
                 self.logger.error(error_msg)
                 raise KeyError(error_msg)
             available_keys.remove(key)
 
         if len(available_keys) > 0:
-            error_msg = f"Available remaining keys in '{Configurer.CONFIG_FILE_WANDB}': {available_keys}"
+            error_msg = f"Available remaining keys in W&B configurations': {available_keys}"
             self.logger.error(error_msg)
             raise KeyError(error_msg)
 

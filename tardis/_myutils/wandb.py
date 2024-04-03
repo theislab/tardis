@@ -4,7 +4,6 @@ import wandb
 
 
 def check_wandb_configurations(wandb_configurations):
-    
 
     # check/start wandb login
     if wandb.api.api_key is None:
@@ -21,9 +20,15 @@ def check_wandb_configurations(wandb_configurations):
         possible_entities = [i["node"]["name"] for i in wandb.api.viewer_server_info()[0]["teams"]["edges"]]
     except KeyError:
         raise KeyError("Unexpected error: Different structure for wandb teams.")
-    assert wandb_configurations["login_credentials"]["username"] in possible_entities
-    assert wandb_configurations["wandblogger_kwargs"]["entity"] in possible_entities
 
+    u = wandb_configurations["login_credentials"]["username"]
     e = wandb_configurations["wandblogger_kwargs"]["entity"]
+
+    assert (
+        u in possible_entities
+    ), f"Provided username `{u}` is not amongst possible entitites for this account: {possible_entities}"
+    assert (
+        e in possible_entities
+    ), f"Provided entity `{e}` is not amongst possible entitites for this account: {possible_entities}"
     if wandb.api.entity_is_team(e):
         assert e in possible_entities
