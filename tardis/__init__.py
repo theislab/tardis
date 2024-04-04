@@ -1,4 +1,4 @@
 #!/usr/bin/env python3
 
-from ._myconfig import config_local, config_server  # noqa
+from ._config import config_local, config_server  # noqa
 from ._mymodel import MyModel  # noqa

@@ -21,12 +21,13 @@ from scvi.data.fields import (
 from scvi.model._utils import _init_library_size
 from scvi.model.base import ArchesMixin, BaseModelClass, RNASeqMixin, VAEMixin
 
+from ._disentenglementtargetconfigurations import DisentenglementTargetConfigurations
+from ._disentenglementtargetmanager import DisentenglementTargetManager
 from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
-from ._mydatasplitter import CounteractiveMinibatchGenerator
 from ._mymodule import MyModule
 from ._mytrainingmixin import MyUnsupervisedTrainingMixin
-from ._myutils.wandb import check_wandb_configurations
-from ._myutils.warnings import ignore_predetermined_warnings
+from ._utils.wandb import check_wandb_configurations
+from ._utils.warnings import ignore_predetermined_warnings
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ class MyModel(
         n_layers: int = 1,
         dropout_rate: float = 0.1,
         dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
-        gene_likelihood: Literal["zinb", "nb", "poisson"] = "zinb",
+        gene_likelihood: Literal["zinb", "nb", "poisson"] = "nb",
         latent_distribution: Literal["normal", "ln"] = "normal",
         **kwargs,
     ):
@@ -122,9 +123,6 @@ class MyModel(
         if not use_size_factor_key:
             library_log_means, library_log_vars = _init_library_size(self.adata_manager, n_batch)
 
-        # TODO: check total latent space is ok for reserved latent variables
-        # Update the latent indices in CounteractiveMinibatchGenerator..
-
         self.module = self._module_cls(
             n_input=self.summary_stats.n_vars,
             n_batch=n_batch,
@@ -146,30 +144,6 @@ class MyModel(
 
         self.init_params_ = self._get_init_params(locals())
 
-    @staticmethod
-    def _disentenglement_targets_configurations_processor(disentenglement_targets_configurations: list[dict] | None):
-
-        # TODO:
-
-        # convert it to empty list if it is None
-        if disentenglement_targets_configurations is None:
-            return []
-
-        # include `upper_loss`, `lower_loss` boolean choices, and allow setting a loss function for each.
-        
-        # include `indexer_method` choice. for now only `random` implemented.. 
-        
-        # configurations in strategy is here for each metadata (including seed)
-
-        # how many latent space will be devoted to this one
-
-        # add a new key index of each element
-        # key is here for each metadata
-        
-        # assert it is list of dicts, with only allowed keys.
-
-        return disentenglement_targets_configurations  # TODO
-
     @classmethod
     def setup_anndata(
         cls,
@@ -185,14 +159,15 @@ class MyModel(
     ):
         setup_method_args = cls._get_setup_method_args(**locals())
 
-        disentenglement_targets_configurations = MyModel._disentenglement_targets_configurations_processor(
-            disentenglement_targets_configurations=disentenglement_targets_configurations
+        if disentenglement_targets_configurations is None:
+            disentenglement_targets_configurations = []
+        # This also checks whether the dict follows the format required.
+        disentenglement_targets_configurations = DisentenglementTargetConfigurations(
+            items=disentenglement_targets_configurations
         )
-        disentenglement_targets_setup_anndata_keys = (
-            None
-            if len(disentenglement_targets_configurations) == 0
-            else [c["key"] for c in disentenglement_targets_configurations]
-        )
+
+        _dtsak = disentenglement_targets_configurations.get_ordered_obs_key()
+        disentenglement_targets_setup_anndata_keys = _dtsak if len(_dtsak) > 0 else None
 
         anndata_fields = [
             LayerField(REGISTRY_KEYS.X_KEY, layer, is_count_data=True),
@@ -209,17 +184,14 @@ class MyModel(
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
 
-        if disentenglement_targets_setup_anndata_keys is not None:
-            CounteractiveMinibatchGenerator.set_disentenglement_targets_configurations(
-                value=disentenglement_targets_configurations
-            )
-            CounteractiveMinibatchGenerator.set_anndata_manager_state_registry(
-                value={
-                    registry_key: adata_manager.registry["field_registries"][registry_key]["state_registry"]
-                    for registry_key in adata_manager.registry["field_registries"]
-                    if registry_key != REGISTRY_KEYS.X_KEY
-                }
-            )
+        DisentenglementTargetManager.set_configurations(value=disentenglement_targets_configurations)
+        DisentenglementTargetManager.set_anndata_manager_state_registry(
+            value={
+                registry_key: adata_manager.registry["field_registries"][registry_key]["state_registry"]
+                for registry_key in adata_manager.registry["field_registries"]
+                if registry_key != REGISTRY_KEYS.X_KEY
+            }
+        )
 
     @classmethod
     def setup_wandb(cls, wandb_configurations: dict, hyperparams: dict | None = None, check_credientials: bool = False):

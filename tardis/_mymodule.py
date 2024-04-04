@@ -16,6 +16,8 @@ from torch import logsumexp
 from torch.distributions import Normal
 from torch.distributions import kl_divergence as kl
 
+from ._disentenglementtargetmanager import DisentenglementTargetManager
+
 torch.backends.cudnn.benchmark = True
 
 logger = logging.getLogger(__name__)
@@ -108,7 +110,7 @@ class MyModule(BaseModuleClass):
         dropout_rate: Tunable[float] = 0.1,
         dispersion: Tunable[Literal["gene", "gene-batch", "gene-label", "gene-cell"]] = "gene",
         log_variational: Tunable[bool] = True,
-        gene_likelihood: Tunable[Literal["zinb", "nb", "poisson"]] = "zinb",
+        gene_likelihood: Tunable[Literal["zinb", "nb", "poisson"]] = "nb",
         latent_distribution: Tunable[Literal["normal", "ln"]] = "normal",
         encode_covariates: Tunable[bool] = False,
         deeply_inject_covariates: Tunable[bool] = True,
@@ -132,6 +134,20 @@ class MyModule(BaseModuleClass):
         self.n_labels = n_labels
         self.latent_distribution = latent_distribution
         self.encode_covariates = encode_covariates
+
+        # Modify `DisentenglementTargetManager` to define reserved latents in loss calculations.
+        self.n_total_reserved_latent = 0
+        for dtconfig in DisentenglementTargetManager.configurations.items:
+            dtconfig.reserved_latent_indices = list(
+                range(self.n_total_reserved_latent, self.n_total_reserved_latent + dtconfig.n_reserved_latent)
+            )
+            self.n_total_reserved_latent += dtconfig.n_reserved_latent
+        if self.n_latent - self.n_total_reserved_latent < 1:
+            raise ValueError("Not enough latent space variables to reserve for targets.")
+        self.n_total_unreserved_latent = self.n_latent - self.n_total_reserved_latent
+        DisentenglementTargetManager.configurations.unreserved_latent_indices = list(
+            range(self.n_total_reserved_latent, self.n_latent)
+        )  # If no target is defined, this list will contain latent space variables.
 
         self.use_size_factor_key = use_size_factor_key
         self.use_observed_lib_size = use_size_factor_key or use_observed_lib_size
