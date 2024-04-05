@@ -5,7 +5,8 @@ from scvi.dataloaders import DataSplitter
 from scvi.dataloaders._ann_dataloader import AnnDataLoader
 from torch.utils.data.dataloader import _BaseDataLoaderIter, _SingleProcessDataLoaderIter
 
-from ._myconstants import MODEL_NAME
+from ._disentenglementtargetmanager import DisentenglementTargetManager, CounteractiveMinibatchGenerator
+from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
 
 
 class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
@@ -14,41 +15,46 @@ class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
         index = self._next_index()  # may raise StopIteration
         data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
 
-        # TODO
+        data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS] = dict()
+        if len(DisentenglementTargetManager.configurations) > 0:
+            # `data` is simply the minibatch itself.
+            original_tensor_keys_sorted = sorted(data.keys())
+            # The aim is create alternative minibatches that has the same keys as the original one
+            # These minibatches, called counteractive minibatch, will be fed through `forward` method.
+            for target_obs_key_ind, target_obs_key in enumerate(
+                DisentenglementTargetManager.configurations.get_ordered_obs_key()
+            ):
+                target_config = DisentenglementTargetManager.configurations.items[
+                    target_obs_key_ind
+                ].counteractive_minibatch_settings
+                target_obs_key_tensors_indices = CounteractiveMinibatchGenerator.main(
+                    # Full dataset, loaded tensors can be configured by setup_anndata.
+                    dataset_tensors=self._dataset.dataset.data,
+                    target_obs_key=target_obs_key,
+                    # Train/validation/test indices. Maximum indice is the dataset size.
+                    # Number of indices are defined by `train_size` parameter of Trainer.
+                    splitter_index=self._dataset.indices,
+                    # Minibatch indices. Maximum indice is defined by `dataset` length and `train_size`.
+                    # Note that this is index of `self._dataset.indices`, not the index of real full dataset.
+                    minibatch_relative_index=index,
+                    # The method and method kwargs for counteractive_minibatch_settings, defined by the user.
+                    method=target_config.method,
+                    **target_config.method_kwargs,
+                )
+                # assert len(target_obs_key_tensors_indices) == len(index), "Remove after development - 1."
+                # target_obs_key_tensors = self._dataset_fetcher.fetch(target_obs_key_tensors_indices)
+                # assert original_tensor_keys_sorted == sorted(target_obs_key_tensors.keys()), "Remove after development - 2."
+                # data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key] = target_obs_key_tensors
 
-        # print("\n#######")
-        # print(data["extra_categorical_covs"].shape)
-        # print("#######")
-
-        # Full dataset is here, loaded tensors can be configured by setup_anndata
-        # self._dataset.dataset.data
-
-        # Train/Validation indices
-        # self._dataset.indices
-
-        # Minibatch is here, loaded tensors can be configured by setup_anndata
-        # data
-
-        # minibatch index is here:
-        # note that this is the index of self._dataset.indices, not the index of real full dataset!!!
-        # index (list)
-
-        # use dataset_fetcher... it will create another data.. this is actually
-        # all you need for another forward run, so keep it separate, maybe
-        # create_counteractive_minibatch_index and call `self._dataset_fetcher.fetch(counteractive_minibatch_index)`
-
-        # a list of dict saying which strategy to use, and settings in strategy method.
-        # it should be created in setup_anndata
-
-        # look _disentenglement_targets_configurations to get with method to choose in DisentenglementTargetManager..
-        # use DisentenglementTargetManager method to get indexes for each metadata....
-
-        # add a key to data: disentenglement_targets.
-        # add a key to data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][age/sex etc] = \
-        # {X: tensor, labels: tensor, batch: tensor...}
-        # sanirim bu yuzden, pin_memory'yi de yenilemen gerekiyor, bu yapi icin uygun degil zira.
+        if False:
+            print("\n###Remove here after model development!###")
+            print(data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS]["sample_ID"])
+            print("#")
 
         if self._pin_memory:
+            raise NotImplementedError(  # TODO
+                "pin_memory needs to be adapted, it is not suitable for deep dictionary structure (or empty dict)."
+            )
             data = torch.utils.data._utils.pin_memory.pin_memory(data, self._pin_memory_device)
         return data
 
