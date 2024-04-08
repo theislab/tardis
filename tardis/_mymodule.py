@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import copy
 import logging
 from collections.abc import Iterable
 from typing import Callable, Literal, Optional
@@ -16,6 +17,7 @@ from torch import logsumexp
 from torch.distributions import Normal
 from torch.distributions import kl_divergence as kl
 
+from ._DEBUG import DEBUG  # noqa
 from ._disentenglementtargetmanager import DisentenglementTargetManager
 
 torch.backends.cudnn.benchmark = True
@@ -147,7 +149,7 @@ class MyModule(BaseModuleClass):
         self.n_total_unreserved_latent = self.n_latent - self.n_total_reserved_latent
         DisentenglementTargetManager.configurations.unreserved_latent_indices = list(
             range(self.n_total_reserved_latent, self.n_latent)
-        )  # If no target is defined, this list will contain latent space variables.
+        )  # If no target is defined, this list will contain all latent space variables.
 
         self.use_size_factor_key = use_size_factor_key
         self.use_observed_lib_size = use_size_factor_key or use_observed_lib_size
@@ -413,6 +415,13 @@ class MyModule(BaseModuleClass):
             "pz": pz,
         }
 
+    def _debug(self, tensors):
+
+        a = copy.deepcopy(locals())
+        for i in a:
+            if i not in ["cls", "mro"]:
+                exec(f"DEBUG.{i} = a[i]")
+
     def loss(
         self,
         tensors,
@@ -421,6 +430,8 @@ class MyModule(BaseModuleClass):
         kl_weight: float = 1.0,
     ):
         """Computes the loss function for the model."""
+        self._debug(tensors)
+
         x = tensors[REGISTRY_KEYS.X_KEY]
         kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(dim=-1)
         if not self.use_observed_lib_size:

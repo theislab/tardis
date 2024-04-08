@@ -21,6 +21,7 @@ from scvi.data.fields import (
 from scvi.model._utils import _init_library_size
 from scvi.model.base import ArchesMixin, BaseModelClass, RNASeqMixin, VAEMixin
 
+from ._cachedpossiblegroupdefinitionindices import CachedPossibleGroupDefinitionIndices
 from ._disentenglementtargetconfigurations import DisentenglementTargetConfigurations
 from ._disentenglementtargetmanager import DisentenglementTargetManager
 from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
@@ -184,6 +185,7 @@ class MyModel(
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
 
+        CachedPossibleGroupDefinitionIndices.reset()
         DisentenglementTargetManager.set_configurations(value=disentenglement_targets_configurations)
         DisentenglementTargetManager.set_anndata_manager_state_registry(
             value={

@@ -91,6 +91,7 @@ class MyUnsupervisedTrainingMixin(UnsupervisedTrainingMixin):
                 self.wandb_logger.experiment.finish(exit_code=exit_code, quiet=True)
                 wandb_message = (
                     f"W&B logger finalized with the following parameters: \n"
+                    f"Exit Code: {exit_code}\n"
                     f"Entity: {self.wandb_logger.experiment.entity}\n"
                     f"Project: {self.wandb_logger.experiment.project}\n"
                     f"ID: {self.wandb_logger.experiment.id}\n"
