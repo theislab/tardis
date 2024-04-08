@@ -26,6 +26,7 @@ from ._disentenglementtargetconfigurations import DisentenglementTargetConfigura
 from ._disentenglementtargetmanager import DisentenglementTargetManager
 from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
 from ._mymodule import MyModule
+from ._myplotting import MyPlotting
 from ._mytrainingmixin import MyUnsupervisedTrainingMixin
 from ._utils.wandb import check_wandb_configurations
 from ._utils.warnings import ignore_predetermined_warnings
@@ -33,13 +34,7 @@ from ._utils.warnings import ignore_predetermined_warnings
 logger = logging.getLogger(__name__)
 
 
-class MyModel(
-    RNASeqMixin,
-    VAEMixin,
-    ArchesMixin,
-    MyUnsupervisedTrainingMixin,
-    BaseModelClass,
-):
+class MyModel(RNASeqMixin, VAEMixin, ArchesMixin, MyUnsupervisedTrainingMixin, BaseModelClass, MyPlotting):
     """single-cell Variational Inference :cite:p:`Lopez18`.
 
     Parameters

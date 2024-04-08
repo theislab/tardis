@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
-from ._disentenglementtargetmanager import DisentenglementTargetManager
-from ._cachedpossiblegroupdefinitionindices import CachedPossibleGroupDefinitionIndices, DatapointDefinitionsKeyGenerator
-from ._trainingsteplogger import TrainingStepLogger
-
 import numpy as np
-import copy
 import torch
 from scipy.sparse import spmatrix
+
+from ._cachedpossiblegroupdefinitionindices import (
+    CachedPossibleGroupDefinitionIndices,
+    DatapointDefinitionsKeyGenerator,
+)
+from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._trainingsteplogger import TrainingStepLogger
 
 
 class CounteractiveMinibatchGenerator:
@@ -23,7 +25,9 @@ class CounteractiveMinibatchGenerator:
         - method: Name of the method to use for generating the minibatch.
         - **kwargs: Keyword arguments passed to the method, including method-specific kwargs and common parameters.
         """
-        method = DisentenglementTargetManager.configurations.get_by_index(target_obs_key_ind).counteractive_minibatch_settings.method
+        method = DisentenglementTargetManager.configurations.get_by_index(
+            target_obs_key_ind
+        ).counteractive_minibatch_settings.method
         if (
             not hasattr(CounteractiveMinibatchGenerator, method)
             or method == "main"
@@ -52,18 +56,22 @@ class CounteractiveMinibatchGenerator:
         minibatch_relative_index: list[int],
     ) -> list[int]:
 
-        config = DisentenglementTargetManager.configurations.items[target_obs_key_ind].counteractive_minibatch_settings        
+        config = DisentenglementTargetManager.configurations.items[target_obs_key_ind].counteractive_minibatch_settings
         possible_indices = CachedPossibleGroupDefinitionIndices.get(
             dataset_tensors, target_obs_key_ind, data_split_identifier, splitter_index, config
         )
-        minibatch_definitions = DatapointDefinitionsKeyGenerator.create_definitions(minibatch_tensors, target_obs_key_ind, config)
-        
+        minibatch_definitions = DatapointDefinitionsKeyGenerator.create_definitions(
+            minibatch_tensors, target_obs_key_ind, config
+        )
+
         # Seeded RNG for consistency
-        rng = np.random.default_rng(seed=CounteractiveMinibatchGenerator.configuration_random_seed(config.method_kwargs["seed"])) 
+        rng = np.random.default_rng(
+            seed=CounteractiveMinibatchGenerator.configuration_random_seed(config.method_kwargs["seed"])
+        )
         selected_elements = []
         for datapoint in minibatch_definitions:
             tuple_key = tuple(datapoint.tolist())
             selected_element = rng.choice(possible_indices[tuple_key])
             selected_elements.append(selected_element)
-        
+
         return selected_elements

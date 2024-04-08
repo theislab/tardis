@@ -1,12 +1,14 @@
+#!/usr/bin/env python3
 
 
 class DEBUG:
     pass
 
-# from ._DEV import DEV
+
+# from ._DEBUG import DEBUG
 
 
 # a = copy.deepcopy(locals())
 # for i in a:
 #     if i not in ["cls", "mro"]:
-#         exec(f"DEV.{i} = a[i]")
+#         exec(f"DEBUG.{i} = a[i]")
