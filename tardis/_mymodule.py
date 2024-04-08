@@ -28,6 +28,9 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
             dtconfig.reserved_latent_indices = list(
                 range(self.n_total_reserved_latent, self.n_total_reserved_latent + dtconfig.n_reserved_latent)
             )
+            dtconfig.unreserved_latent_indices = [
+                i for i in range(self.n_latent) if i not in dtconfig.reserved_latent_indices
+            ]
             self.n_total_reserved_latent += dtconfig.n_reserved_latent
         if self.n_latent - self.n_total_reserved_latent < 1:
             raise ValueError("Not enough latent space variables to reserve for targets.")
@@ -35,7 +38,11 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
         DisentenglementTargetManager.configurations.unreserved_latent_indices = list(
             range(self.n_total_reserved_latent, self.n_latent)
         )  # If no target is defined, this list will contain all latent space variables.
+        DisentenglementTargetManager.configurations.latent_indices = list(range(self.n_latent))
 
+        self.auxillary_losses_keys: list[str] | None = None
+
+        # Remove the variable got from VAE initialization due to it is inherited from BaseMinifiedModeModuleClass.
         del self._minified_data_type
 
     @property
@@ -140,7 +147,11 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
         kl_local_no_warmup = kl_divergence_l
 
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
+
         auxillary_losses = self.calculate_auxillary_losses(tensors, inference_outputs)
+        if self.auxillary_losses_keys is None:
+            self.auxillary_losses_keys = list(auxillary_losses.keys())
+
         loss = torch.mean(reconst_loss + weighted_kl_local)
 
         kl_local = {

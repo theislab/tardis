@@ -13,6 +13,12 @@ class TardisLossSettings(BaseModel):
     # Accepts any dict without specific type checking.
     method_kwargs: dict
 
+    @field_validator("weight")
+    def weight_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("`weight` must be more than or equal to 0.")
+        return v
+
 
 class CounteractiveMinibatchSettings(BaseModel):
     method: StrictStr
@@ -27,7 +33,7 @@ class AuxillaryLosses(BaseModel):
     complete_latent: TardisLossSettings
     reserved_subset: TardisLossSettings
     unreserved_subset: TardisLossSettings
-    items: List[str] = ["complete_latent", "reserved_subset", "unreserved_subset"]
+    items: List[str] = {"complete_latent", "reserved_subset", "unreserved_subset"}
 
 
 class DisentenglementTargetConfiguration(BaseModel):
@@ -38,12 +44,13 @@ class DisentenglementTargetConfiguration(BaseModel):
     # This is set after the initialization based on the index of the target in the provided list.
     index: Optional[int] = None
     # This is called once during model initialization.
-    reserved_latent_indices: Optional[List[int]] = None
+    reserved_latent_indices: Optional[List[int]] = None  # reserved by only this target
+    unreserved_latent_indices: Optional[List[int]] = None  # unreserved by only this target
 
     @field_validator("n_reserved_latent")
     def n_reserved_latent_must_be_positive(cls, v):
         if v <= 0:
-            raise ValueError("`n_reserved_latent` must be more than 0")
+            raise ValueError("`n_reserved_latent` must be more than or equal to 0.")
         return v
 
     @field_validator("index")
@@ -58,10 +65,20 @@ class DisentenglementTargetConfiguration(BaseModel):
             raise ValueError("`reserved_latent_indices` should not be defined by the user.")
         return v
 
+    @field_validator("unreserved_latent_indices")
+    def unreserved_latent_indices_must_undefined_before_init(cls, v):
+        if v is not None:
+            raise ValueError("`unreserved_latent_indices` should not be defined by the user.")
+        return v
+
 
 class DisentenglementTargetConfigurations(BaseModel):
     items: List[DisentenglementTargetConfiguration] = []
+    # unreserved by any of the configuration.
     unreserved_latent_indices: Optional[List[int]] = None
+    # complete list of indices, simply range(n_latent)
+    latent_indices: Optional[List[int]] = None
+    # filled by __init__
     _index_to_obs_key: dict[str:int] = {}
     _obs_key_to_index: dict[str:int] = {}
 
@@ -69,6 +86,12 @@ class DisentenglementTargetConfigurations(BaseModel):
     def unreserved_latent_indices_must_undefined_before_init(cls, v):
         if v is not None:
             raise ValueError("`unreserved_latent_indices` should not be defined by the user.")
+        return v
+
+    @field_validator("latent_indices")
+    def latent_indices_must_undefined_before_init(cls, v):
+        if v is not None:
+            raise ValueError("`latent_indices` should not be defined by the user.")
         return v
 
     @field_validator("items")
