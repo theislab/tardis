@@ -3,15 +3,14 @@
 import copy
 import math
 import warnings
-import numpy as np
-import pandas as pd
 from typing import List, Optional, Tuple
 
-from scvi import settings
-import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from matplotlib.patches import Patch
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
+from scvi import settings
 
 from ._utils.warnings import ignore_predetermined_warnings
 
@@ -30,15 +29,15 @@ class MyPlotting:
         def _ignore_first(history_key, n):
             df = self.history[history_key]
             return df[(df.index >= n)]
-        
-        if not(
+
+        if not (
             isinstance(metrics_name, list) and len(metrics_name) > 0 and all([isinstance(i, str) for i in metrics_name])
         ):
             raise ValueError
-        
+
         if metrics_title is None:
             metrics_title = copy.deepcopy(metrics_name)
-        
+
         if not (
             isinstance(metrics_name, list)
             and len(metrics_title) == len(metrics_name)
@@ -48,11 +47,13 @@ class MyPlotting:
 
         params = [(f"{i}_train", f"{i}_validation", j) for i, j in zip(metrics_name, metrics_title)]
         if extra_triplets is not None:
-            if not isinstance(extra_triplets, list) or not all([isinstance(i, tuple) and len(i) == 3 for i in extra_triplets]):
+            if not isinstance(extra_triplets, list) or not all(
+                [isinstance(i, tuple) and len(i) == 3 for i in extra_triplets]
+            ):
                 raise ValueError
             params.extend(extra_triplets)
         params = tuple(params)
-        
+
         validatation_calculated = "validation_loss" in self.history
         if not validatation_calculated:
             warnings.warn(
@@ -60,14 +61,14 @@ class MyPlotting:
                 category=UserWarning,
                 stacklevel=settings.warnings_stacklevel,
             )
-        
+
         sanity_check = [j[i] for j in params for i in range(2) if j[i] not in self.history]
         sanity_check = [sc for sc in sanity_check if not (sc.endswith("_validation") and validatation_calculated)]
         if len(sanity_check) != 0:
             ValueError(f"Following metrics are not in model.history `{sanity_check}`.")
-            
+
         with ignore_predetermined_warnings():
-            
+
             train_kwargs = {"label": "Train", "color": "darkgray"}
             valid_kwargs = {"label": "Validation", "color": "gray"}
 
@@ -89,7 +90,7 @@ class MyPlotting:
                         ax.legend(fontsize=8)
                     sns.despine(ax=ax, top=True, right=True, left=False, bottom=False, offset=None, trim=False)
                     ax.set_title(title_str, fontsize=10)
-            
+
             plt.tight_layout()
             plt.show()
 
@@ -98,22 +99,30 @@ class MyPlotting:
         # Define the range of lightness values to avoid very dark or very light grays
         lightness_min = 0.2  # Avoid near-black colors
         lightness_max = 0.8  # Avoid near-white colors
-        
+
         # Calculate the step to evenly distribute the gray tones within the range
         step = (lightness_max - lightness_min) / max(1, num_variable - 1)  # Avoid division by zero
-        
+
         # Generate the gray tones with alpha values
-        gray_tones_with_alpha = [mcolors.to_hex((lightness_min + i * step, lightness_min + i * step, lightness_min + i * step, alpha), keep_alpha=True) 
-                                for i in range(num_variable)]
-        
+        gray_tones_with_alpha = [
+            mcolors.to_hex(
+                (lightness_min + i * step, lightness_min + i * step, lightness_min + i * step, alpha), keep_alpha=True
+            )
+            for i in range(num_variable)
+        ]
+
         return gray_tones_with_alpha
 
-    def plot_latent_kde_plot(self, adata_obs: pd.DataFrame, target_obs_key: str, latent_representation: np.ndarray, latent_dim_of_interest: int | None = None):
-        
+    def plot_latent_kde(
+        self,
+        adata_obs: pd.DataFrame,
+        target_obs_key: str,
+        latent_representation: np.ndarray,
+        latent_dim_of_interest: int | None = None,
+    ):
+
         latent_representations_with_metadata = np.append(
-            latent_representation, 
-            adata_obs[target_obs_key].values.reshape(-1, 1), 
-            axis=1
+            latent_representation, adata_obs[target_obs_key].values.reshape(-1, 1), axis=1
         )
         df = pd.DataFrame(
             latent_representations_with_metadata,
@@ -122,27 +131,24 @@ class MyPlotting:
         n_element = len(adata_obs[target_obs_key].unique())
         individual_plot_size = 3
         palette = MyPlotting.generate_gray_tones(n_element)
-        
+
         if latent_dim_of_interest is not None:
-            
+
             with ignore_predetermined_warnings():
                 plt.figure(figsize=(individual_plot_size * 1.5, individual_plot_size * 1.5))
-                sns.kdeplot(
-                    df, x=f"Latent {latent_dim_of_interest}", hue=target_obs_key, fill=True,
-                    palette=palette
-                )
+                sns.kdeplot(df, x=f"Latent {latent_dim_of_interest}", hue=target_obs_key, fill=True, palette=palette)
                 sns.despine(top=True, right=True, left=False, bottom=False)
-                plt.legend(loc='upper right')
+                plt.legend(loc="upper right")
                 plt.show()
-        
+
         else:
             # Determine the optimal subplot grid size
             total_plots = self.module.n_latent
-            cols = math.ceil(total_plots ** 0.5)
+            cols = math.ceil(total_plots**0.5)
             rows = math.ceil(total_plots / cols)
-            
-            fig, axs = plt.subplots(rows, cols, figsize=(cols*individual_plot_size, rows*individual_plot_size))
-            
+
+            fig, axs = plt.subplots(rows, cols, figsize=(cols * individual_plot_size, rows * individual_plot_size))
+
             # Iterate over all latent dimensions to create individual plots
             for i in range(self.module.n_latent):
                 row, col = divmod(i, cols)
@@ -154,18 +160,17 @@ class MyPlotting:
                     ax = axs[col]
 
                 # Only show the legend for the upper right plot
-                plot_legend = (row == 0) and (col == cols-1 if cols > 1 else 0)
+                plot_legend = (row == 0) and (col == cols - 1 if cols > 1 else 0)
 
                 g = sns.kdeplot(
-                    data=df, x=f"Latent {i}", hue=target_obs_key, fill=True, ax=ax,
-                    palette=palette, legend=plot_legend
+                    data=df, x=f"Latent {i}", hue=target_obs_key, fill=True, ax=ax, palette=palette, legend=plot_legend
                 )
                 if plot_legend:
-                    sns.move_legend(g,  "upper right")
+                    sns.move_legend(g, "upper right")
                 sns.despine(ax=ax, top=True, right=True, left=False, bottom=False)
-        
+
             # Remove empty subplots
-            for i in range(self.module.n_latent, rows*cols):
+            for i in range(self.module.n_latent, rows * cols):
                 fig.delaxes(axs.flatten()[i])
 
             plt.tight_layout()

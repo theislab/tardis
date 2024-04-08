@@ -5,7 +5,6 @@ from __future__ import annotations
 import copy
 import logging
 import os
-from typing import Literal
 
 from anndata import AnnData
 from scvi import REGISTRY_KEYS
@@ -18,6 +17,7 @@ from scvi.data.fields import (
     NumericalJointObsField,
     NumericalObsField,
 )
+from scvi.dataloaders._ann_dataloader import AnnDataLoader
 from scvi.model._utils import _init_library_size
 from scvi.model.base import ArchesMixin, BaseModelClass, RNASeqMixin, VAEMixin
 
@@ -35,78 +35,20 @@ logger = logging.getLogger(__name__)
 
 
 class MyModel(RNASeqMixin, VAEMixin, ArchesMixin, MyUnsupervisedTrainingMixin, BaseModelClass, MyPlotting):
-    """single-cell Variational Inference :cite:p:`Lopez18`.
-
-    Parameters
-    ----------
-    adata
-        AnnData object that has been registered via :meth:`~scvi.model.SCVI.setup_anndata`. If
-        ``None``, then the underlying module will not be initialized until training, and a
-        :class:`~lightning.pytorch.core.LightningDataModule` must be passed in during training
-        (``EXPERIMENTAL``).
-    n_hidden
-        Number of nodes per hidden layer.
-    n_latent
-        Dimensionality of the latent space.
-    n_layers
-        Number of hidden layers used for encoder and decoder NNs.
-    dropout_rate
-        Dropout rate for neural networks.
-    dispersion
-        One of the following:
-
-        * ``'gene'`` - dispersion parameter of NB is constant per gene across cells
-        * ``'gene-batch'`` - dispersion can differ between different batches
-        * ``'gene-label'`` - dispersion can differ between different labels
-        * ``'gene-cell'`` - dispersion can differ for every gene in every cell
-    gene_likelihood
-        One of:
-
-        * ``'nb'`` - Negative binomial distribution
-        * ``'zinb'`` - Zero-inflated negative binomial distribution
-        * ``'poisson'`` - Poisson distribution
-    latent_distribution
-        One of:
-
-        * ``'normal'`` - Normal distribution
-        * ``'ln'`` - Logistic normal distribution (Normal(0, I) transformed by softmax)
-    **kwargs
-        Additional keyword arguments for :class:`~_mymodule.MyModule`.
-    """
+    """Tardis model"""
 
     _module_cls = MyModule
+    # Keep the original AnndataLoader for everything else other than training.
+    _data_loader_cls = AnnDataLoader
 
-    def __init__(
-        self,
-        adata: AnnData | None = None,
-        n_hidden: int = 128,
-        n_latent: int = 10,
-        n_layers: int = 1,
-        dropout_rate: float = 0.1,
-        dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
-        gene_likelihood: Literal["zinb", "nb", "poisson"] = "nb",
-        latent_distribution: Literal["normal", "ln"] = "normal",
-        **kwargs,
-    ):
+    def __init__(self, adata: AnnData, **kwargs):
         super().__init__(adata)
-        assert not self._module_init_on_train, "The model currently does not support initialization without data."
 
-        self._module_kwargs = {
-            "n_hidden": n_hidden,
-            "n_latent": n_latent,
-            "n_layers": n_layers,
-            "dropout_rate": dropout_rate,
-            "dispersion": dispersion,
-            "gene_likelihood": gene_likelihood,
-            "latent_distribution": latent_distribution,
-            **kwargs,
-        }
-        self._model_summary_string = (
-            f"{MODEL_NAME} model with the following parameters: \n"
-            f"n_hidden: {n_hidden}, n_latent: {n_latent}, n_layers: {n_layers}, "
-            f"dropout_rate: {dropout_rate}, dispersion: {dispersion}, "
-            f"gene_likelihood: {gene_likelihood}, latent_distribution: {latent_distribution}."
-        )
+        if self._module_init_on_train:
+            raise ValueError("The model currently does not support initialization without data.")
+
+        self._module_kwargs = {**kwargs}
+        self._model_summary_string = f"{MODEL_NAME} model"
 
         n_cats_per_cov = (
             self.adata_manager.get_state_registry(REGISTRY_KEYS.CAT_COVS_KEY).n_cats_per_key
@@ -125,13 +67,6 @@ class MyModel(RNASeqMixin, VAEMixin, ArchesMixin, MyUnsupervisedTrainingMixin, B
             n_labels=self.summary_stats.n_labels,
             n_continuous_cov=self.summary_stats.get("n_extra_continuous_covs", 0),
             n_cats_per_cov=n_cats_per_cov,
-            n_hidden=n_hidden,
-            n_latent=n_latent,
-            n_layers=n_layers,
-            dropout_rate=dropout_rate,
-            dispersion=dispersion,
-            gene_likelihood=gene_likelihood,
-            latent_distribution=latent_distribution,
             use_size_factor_key=use_size_factor_key,
             library_log_means=library_log_means,
             library_log_vars=library_log_vars,
