@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import copy
 import logging
 
 import torch
@@ -9,16 +8,16 @@ from scvi.module import VAE
 from scvi.module.base import LossOutput, auto_move_data
 from torch.distributions import kl_divergence as kl
 
-from ._DEBUG import DEBUG  # noqa
 from ._disentenglementtargetmanager import DisentenglementTargetManager
 from ._myconstants import minified_method_not_supported_message
+from ._mymoduleauxillarylosses import MyModuleAuxillaryLosses
 
 torch.backends.cudnn.benchmark = True
 
 logger = logging.getLogger(__name__)
 
 
-class MyModule(VAE):
+class MyModule(VAE, MyModuleAuxillaryLosses):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -118,13 +117,6 @@ class MyModule(VAE):
         outputs = {"z": z, "qz": qz, "ql": ql, "library": library}
         return outputs
 
-    def _debug(self, tensors):
-
-        a = copy.deepcopy(locals())
-        for i in a:
-            if i not in ["cls", "mro"]:
-                exec(f"DEBUG.{i} = a[i]")
-
     def loss(
         self,
         tensors,
@@ -132,8 +124,6 @@ class MyModule(VAE):
         generative_outputs,
         kl_weight: float = 1.0,
     ):
-        self._debug(tensors)
-
         x = tensors[REGISTRY_KEYS.X_KEY]
         kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(dim=-1)
         if not self.use_observed_lib_size:
@@ -150,14 +140,17 @@ class MyModule(VAE):
         kl_local_no_warmup = kl_divergence_l
 
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
-
+        auxillary_losses = self.calculate_auxillary_losses(tensors, inference_outputs)
         loss = torch.mean(reconst_loss + weighted_kl_local)
 
         kl_local = {
             "kl_divergence_l": kl_divergence_l,
             "kl_divergence_z": kl_divergence_z,
         }
-        return LossOutput(loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_local)
+
+        return LossOutput(
+            loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_local, extra_metrics=auxillary_losses
+        )
 
     @torch.inference_mode()
     @auto_move_data

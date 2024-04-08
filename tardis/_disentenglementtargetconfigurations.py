@@ -7,9 +7,9 @@ from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, f
 
 class TardisLossSettings(BaseModel):
     apply: StrictBool
-    method: StrictStr
     weight: StrictFloat
     negative_sign: StrictBool
+    method: StrictStr
     # Accepts any dict without specific type checking.
     method_kwargs: dict
 
@@ -24,8 +24,10 @@ class CounteractiveMinibatchSettings(BaseModel):
 
 
 class AuxillaryLosses(BaseModel):
-    loss_complete_latent: TardisLossSettings
-    loss_subset_latent: TardisLossSettings
+    complete_latent: TardisLossSettings
+    reserved_subset: TardisLossSettings
+    unreserved_subset: TardisLossSettings
+    items: List[str] = ["complete_latent", "reserved_subset", "unreserved_subset"]
 
 
 class DisentenglementTargetConfiguration(BaseModel):
@@ -103,48 +105,3 @@ class DisentenglementTargetConfigurations(BaseModel):
 
     def get_ordered_obs_key(self) -> list[str]:
         return [self._index_to_obs_key[i] for i in range(len(self.items))]
-
-
-def _disentenglement_target_configurations_example_usage():
-    """Example usage of the object.
-
-    Adapt the `config_data_filled` and call function for debugging. Attempts to validate the
-    provided configuration data against the Configurations model. Prints out any validation
-    errors encountered.
-    """
-    config_data_empty = {"items": []}
-    _validated_data_empty = DisentenglementTargetConfigurations(**config_data_empty)  # noqa
-
-    # Example input data with filled items
-    config_data_filled = {
-        "items": [
-            {
-                "obs_key": "example_key",
-                "n_reserved_latent": 1,
-                "counteractive_minibatch_settings": {
-                    "method": "example_method",
-                    "method_kwargs": {"param1": "value1", "param2": True},
-                },
-                "auxillary_losses": {
-                    "loss_complete_latent": {
-                        "apply": True,
-                        "method": "mse",
-                        "weight": 1.0,
-                        "negative_sign": True,
-                        "method_kwargs": {},
-                    },
-                    "loss_subset_latent": {
-                        "apply": False,
-                        "method": "cross_entropy",
-                        "weight": 2.0,
-                        "negative_sign": True,
-                        "method_kwargs": {},
-                    },
-                },
-            },
-        ]
-    }
-    _validated_data_filled = DisentenglementTargetConfigurations(**config_data_filled)  # noqa
-
-
-_disentenglement_target_configurations_example_usage()
