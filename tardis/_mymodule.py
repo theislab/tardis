@@ -12,6 +12,8 @@ from ._disentenglementtargetmanager import DisentenglementTargetManager
 from ._myconstants import minified_method_not_supported_message
 from ._mymoduleauxillarylosses import MyModuleAuxillaryLosses
 
+from ._DEBUG import DEBUG
+
 torch.backends.cudnn.benchmark = True
 
 logger = logging.getLogger(__name__)
@@ -149,10 +151,19 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
         auxillary_losses = self.calculate_auxillary_losses(tensors, inference_outputs)
-        if self.auxillary_losses_keys is None:
+        if self.auxillary_losses_keys is None and len(auxillary_losses) > 0:
             self.auxillary_losses_keys = list(auxillary_losses.keys())
+        
+        if len(auxillary_losses) > 0:
+            total_auxillary_losses = torch.sum(torch.stack(list(auxillary_losses.values())), dim=0)
+        else:
+            total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(reconst_loss.device)
+        
+        report_auxillary_losses = {i: torch.mean(auxillary_losses[i]) for i in auxillary_losses}
+        report_auxillary_losses["mean"] = torch.mean(total_auxillary_losses)
+        
+        loss = torch.mean(reconst_loss + weighted_kl_local + total_auxillary_losses)
 
-        loss = torch.mean(reconst_loss + weighted_kl_local)
 
         kl_local = {
             "kl_divergence_l": kl_divergence_l,
@@ -160,7 +171,7 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
         }
 
         return LossOutput(
-            loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_local, extra_metrics=auxillary_losses
+            loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_local, extra_metrics=report_auxillary_losses
         )
 
     @torch.inference_mode()

@@ -46,11 +46,11 @@ class MyModuleAuxillaryLosses:
     @staticmethod
     def _relevant_latent_indices(auxillary_loss_key, target_obs_key_ind):
         if auxillary_loss_key == "complete_latent":
-            pass  # TODO
+            return DisentenglementTargetManager.configurations.latent_indices
         elif auxillary_loss_key == "reserved_subset":
-            pass  # TODO
+            return DisentenglementTargetManager.configurations.get_by_index(target_obs_key_ind).reserved_latent_indices
         elif auxillary_loss_key == "unreserved_subset":
-            pass  # TODO
+            return DisentenglementTargetManager.configurations.get_by_index(target_obs_key_ind).unreserved_latent_indices
         else:
             raise ValueError("Unknown auxillary loss.")
 
@@ -58,32 +58,50 @@ class MyModuleAuxillaryLosses:
         self, inference_outputs, inference_outputs_counteractive, config, relevant_latent_indices
     ):
         if not config.apply:
-            return torch.tensor(-212.0)
+            return torch.zeros(inference_outputs["z"].shape[0]).to(inference_outputs["z"].device)
 
         latent_distribution = self.latent_distribution
         if config.method == "wasserstein" and latent_distribution == "normal":
             func = self.wasserstein_with_normal_parameters
-
         elif config.method == "wasserstein" and latent_distribution == "ln":
             raise NotImplementedError("`wasserstein` method with `ln` latent distribution is not implemented yet.")
         elif config.method == "kl" and latent_distribution == "normal":
-            # TODO: Also implement this one.
+            # TODO
             raise NotImplementedError("`kl` method with `normal` latent distribution is not implemented yet.")
         elif config.method == "kl" and latent_distribution == "ln":
             raise NotImplementedError("`kl` method with `ln` latent distribution is not implemented yet.")
         else:
             raise ValueError("Unknown auxillary loss method and latent distribution combination.")
 
-        # print(inference_outputs["qz"])
-        DEBUG.inference_outputs = inference_outputs["qz"]
-
-        # TODO: subset the latent with the provided reserved_latent list
-        loss = func(inference_outputs["qz"], inference_outputs_counteractive["qz"], **config.method_kwargs)
+        loss = func(inference_outputs, inference_outputs_counteractive, relevant_latent_indices, **config.method_kwargs)
         return loss * config.weight * (-1 if config.negative_sign is True else +1)
 
-    def wasserstein_with_normal_parameters(self, qz_minibatch, qz_counteractive):
-        # TODO: calculate wasserstein loss.
-        return torch.tensor(1.0)
+    def wasserstein_with_normal_parameters(self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices, epsilon=1e-8):
+        
+        # W_{2,i}^2 = (\mu_{1,i} - \mu_{2,i})^2 + (\sigma_{1,i}^2 + \sigma_{2,i}^2 - 2 \sigma_{1,i} \sigma_{2,i})
+        
+        # This formula assumes that the covariance matrices are diagonal, allowing for an element-wise computation.
+        # A covariance matrix is said to be diagonal if all off-diagonal elements are zero. This means that there's 
+        # no covariance between different dimensions—each dimension varies independently of the others.
+        
+        qz_inference = inference_outputs["qz"]
+        qz_counteractive = inference_outputs_counteractive["qz"]
+        loc_inference = qz_inference.loc[:, relevant_latent_indices]
+        loc_counteractive = qz_counteractive.loc[:, relevant_latent_indices]
+        scale_inference = qz_inference.scale[:, relevant_latent_indices]
+        scale_counteractive = qz_counteractive.scale[:, relevant_latent_indices]
+        # epsilon is for numerical stability
+        scale_inference_squared = torch.pow(scale_inference + epsilon, 2)
+        scale_counteractive_squared = torch.pow(scale_counteractive + epsilon, 2)
+        
+        # The squared difference of means, element-wise.
+        mean_diff_sq = (loc_inference - loc_counteractive).pow(2)
+        # For diagonal covariances, the trace term simplifies to an element-wise operation.
+        trace_term = scale_inference_squared + scale_counteractive_squared - 2 * (scale_inference * scale_counteractive)
+        
+        # Just mean to get the total loss for each datapoint.
+        # The loss should note be scaled up or down based on number of relevant latents, so not sum but mean.
+        return (mean_diff_sq + trace_term).mean(dim=1)
 
     def wasserstein_with_ln_parameters(self):
         pass

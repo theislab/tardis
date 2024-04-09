@@ -35,7 +35,12 @@ class DatapointDefinitionsKeyGenerator:
             labels_definitions = np.zeros_like(batch_definitions)
 
         if config.method_kwargs["within_other_groups"] and operation_mode_torch:
+            # This is called when minibatch_definitions is being created, not during indice caching.
             group_definitions = dict_items[REGISTRY_KEY_DISENTENGLEMENT_TARGETS][:, target_obs_key_ind].view(-1, 1)
+            # The if the calculated group_definitions is not changed, then the
+            # counteractive minibatch will be always within the same group.
+            # The randomization of this vector to any other category than the original one
+            # is done after `minibatch_definitions` is created.
         elif config.method_kwargs["within_other_groups"]:
             group_definitions = (
                 dict_items[REGISTRY_KEY_DISENTENGLEMENT_TARGETS].iloc[:, target_obs_key_ind].values.reshape(-1, 1)
