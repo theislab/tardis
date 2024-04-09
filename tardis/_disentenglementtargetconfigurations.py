@@ -4,20 +4,35 @@ from typing import List, Optional
 
 from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator  # ValidationError
 
+from ._myconstants import LOSS_NAMING_DELIMITER, LOSS_NAMING_PREFIX
+from ._progressbarmetrics import ProgressBarMetrics
+
 
 class TardisLossSettings(BaseModel):
     apply: StrictBool
     weight: StrictFloat
     negative_sign: StrictBool
     method: StrictStr
+    progress_bar: StrictBool
     # Accepts any dict without specific type checking.
     method_kwargs: dict
+    loss_identifier_string: str | None = None
 
     @field_validator("weight")
     def weight_must_be_positive(cls, v):
         if v <= 0:
             raise ValueError("`weight` must be more than or equal to 0.")
         return v
+
+    @field_validator("loss_identifier_string")
+    def loss_identifier_string_must_undefined_before_init(cls, v):
+        if v is not None:
+            raise ValueError("`loss_identifier_string` should not be defined by the user.")
+        return v
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add index to each configuration post-initialization
 
 
 class CounteractiveMinibatchSettings(BaseModel):
@@ -71,6 +86,15 @@ class DisentenglementTargetConfiguration(BaseModel):
             raise ValueError("`unreserved_latent_indices` should not be defined by the user.")
         return v
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add full_name and config progress bar each configuration post-initialization
+
+        for auxillary_loss_key in self.auxillary_losses.items:
+            getattr(self.auxillary_losses, auxillary_loss_key).loss_identifier_string = LOSS_NAMING_DELIMITER.join(
+                [LOSS_NAMING_PREFIX, self.obs_key, auxillary_loss_key]
+            )
+
 
 class DisentenglementTargetConfigurations(BaseModel):
     items: List[DisentenglementTargetConfiguration] = []
@@ -81,6 +105,7 @@ class DisentenglementTargetConfigurations(BaseModel):
     # filled by __init__
     _index_to_obs_key: dict[str:int] = {}
     _obs_key_to_index: dict[str:int] = {}
+    # progress_bar_metrics: set() = copy.deepcopy()
 
     @field_validator("unreserved_latent_indices")
     def unreserved_latent_indices_must_undefined_before_init(cls, v):
@@ -111,6 +136,11 @@ class DisentenglementTargetConfigurations(BaseModel):
         for config in self.items:
             self._index_to_obs_key[config.index] = config.obs_key
             self._obs_key_to_index[config.obs_key] = config.index
+        for config in self.items:
+            for auxillary_loss_key in config.auxillary_losses.items:
+                loss_config = getattr(config.auxillary_losses, auxillary_loss_key)
+                if loss_config.progress_bar:
+                    ProgressBarMetrics.add(loss_config.loss_identifier_string)
 
     def __len__(self):
         return len(self.items)

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import torch
+import torch.nn.functional as F
 from scvi.module.base import auto_move_data
 from torch.distributions import kl_divergence as kl
 
-from ._DEBUG import DEBUG
 from ._disentenglementtargetmanager import DisentenglementTargetManager
-from ._myconstants import LOSS_NAMING_DELIMITER, REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS
+from ._myconstants import REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS
 
 
 class MyModuleAuxillaryLosses:
@@ -39,7 +39,7 @@ class MyModuleAuxillaryLosses:
                     config=config_individual,
                     relevant_latent_indices=relevant_latent_indices,
                 )
-                result[LOSS_NAMING_DELIMITER.join([target_obs_key, auxillary_loss_key])] = loss
+                result[config_individual.loss_identifier_string] = loss
 
         return result
 
@@ -50,7 +50,9 @@ class MyModuleAuxillaryLosses:
         elif auxillary_loss_key == "reserved_subset":
             return DisentenglementTargetManager.configurations.get_by_index(target_obs_key_ind).reserved_latent_indices
         elif auxillary_loss_key == "unreserved_subset":
-            return DisentenglementTargetManager.configurations.get_by_index(target_obs_key_ind).unreserved_latent_indices
+            return DisentenglementTargetManager.configurations.get_by_index(
+                target_obs_key_ind
+            ).unreserved_latent_indices
         else:
             raise ValueError("Unknown auxillary loss.")
 
@@ -61,12 +63,19 @@ class MyModuleAuxillaryLosses:
             return torch.zeros(inference_outputs["z"].shape[0]).to(inference_outputs["z"].device)
 
         latent_distribution = self.latent_distribution
-        if config.method == "wasserstein" and latent_distribution == "normal":
+
+        if config.method == "wasserstein_qz" and latent_distribution == "normal":
             func = self.wasserstein_with_normal_parameters
-        elif config.method == "wasserstein" and latent_distribution == "ln":
+
+        elif config.method == "wasserstein_qz" and latent_distribution == "ln":
             raise NotImplementedError("`wasserstein` method with `ln` latent distribution is not implemented yet.")
+
+        elif config.method == "mse_z":
+            func = self.mse_with_reparametrized_z
+        elif config.method == "mae_z":
+            func = self.mae_with_reparametrized_z
+
         elif config.method == "kl" and latent_distribution == "normal":
-            # TODO
             raise NotImplementedError("`kl` method with `normal` latent distribution is not implemented yet.")
         elif config.method == "kl" and latent_distribution == "ln":
             raise NotImplementedError("`kl` method with `ln` latent distribution is not implemented yet.")
@@ -76,14 +85,33 @@ class MyModuleAuxillaryLosses:
         loss = func(inference_outputs, inference_outputs_counteractive, relevant_latent_indices, **config.method_kwargs)
         return loss * config.weight * (-1 if config.negative_sign is True else +1)
 
-    def wasserstein_with_normal_parameters(self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices, epsilon=1e-8):
-        
+    def mse_with_reparametrized_z(self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices):
+        return F.mse_loss(
+            input=inference_outputs_counteractive["z"][:, relevant_latent_indices].clone(),  # true
+            target=inference_outputs["z"][:, relevant_latent_indices].clone(),  # pred
+            reduction="none",
+        ).mean(dim=1)
+
+    def mae_with_reparametrized_z(self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices):
+        return F.l1_loss(
+            input=inference_outputs_counteractive["z"][:, relevant_latent_indices].clone(),  # true
+            target=inference_outputs["z"][:, relevant_latent_indices].clone(),  # pred
+            reduction="none",
+        ).mean(dim=1)
+
+    def wasserstein_with_normal_parameters(
+        self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices, epsilon=1e-8
+    ):
+
         # W_{2,i}^2 = (\mu_{1,i} - \mu_{2,i})^2 + (\sigma_{1,i}^2 + \sigma_{2,i}^2 - 2 \sigma_{1,i} \sigma_{2,i})
-        
+
         # This formula assumes that the covariance matrices are diagonal, allowing for an element-wise computation.
-        # A covariance matrix is said to be diagonal if all off-diagonal elements are zero. This means that there's 
+        # A covariance matrix is said to be diagonal if all off-diagonal elements are zero. This means that there's
         # no covariance between different dimensions—each dimension varies independently of the others.
-        
+
+        # Note: It seems it competes with VAE's KL-loss as expected.
+        # You cannot expect the distribution to be all normal and different.
+
         qz_inference = inference_outputs["qz"]
         qz_counteractive = inference_outputs_counteractive["qz"]
         loc_inference = qz_inference.loc[:, relevant_latent_indices]
@@ -93,21 +121,12 @@ class MyModuleAuxillaryLosses:
         # epsilon is for numerical stability
         scale_inference_squared = torch.pow(scale_inference + epsilon, 2)
         scale_counteractive_squared = torch.pow(scale_counteractive + epsilon, 2)
-        
+
         # The squared difference of means, element-wise.
         mean_diff_sq = (loc_inference - loc_counteractive).pow(2)
         # For diagonal covariances, the trace term simplifies to an element-wise operation.
         trace_term = scale_inference_squared + scale_counteractive_squared - 2 * (scale_inference * scale_counteractive)
-        
+
         # Just mean to get the total loss for each datapoint.
         # The loss should note be scaled up or down based on number of relevant latents, so not sum but mean.
         return (mean_diff_sq + trace_term).mean(dim=1)
-
-    def wasserstein_with_ln_parameters(self):
-        pass
-
-    def kl_with_normal_parameters(self):
-        pass
-
-    def kl_with_ln_parameters(self):
-        pass

@@ -28,6 +28,7 @@ from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
 from ._mymodule import MyModule
 from ._myplotting import MyPlotting
 from ._mytrainingmixin import MyUnsupervisedTrainingMixin
+from ._progressbarmetrics import ProgressBarMetrics
 from ._utils.wandb import check_wandb_configurations
 from ._utils.warnings import ignore_predetermined_warnings
 
@@ -90,6 +91,7 @@ class MyModel(RNASeqMixin, VAEMixin, ArchesMixin, MyUnsupervisedTrainingMixin, B
     ):
         setup_method_args = cls._get_setup_method_args(**locals())
 
+        ProgressBarMetrics.reset()
         if disentenglement_targets_configurations is None:
             disentenglement_targets_configurations = []
         # This also checks whether the dict follows the format required.

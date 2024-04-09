@@ -175,7 +175,10 @@ class CachedPossibleGroupDefinitionIndices:
                 raise ValueError("The `reset` method should be called in the beginning.")
             obs_key = DisentenglementTargetManager.configurations.get_by_index(target_obs_key_ind).obs_key
             warnings.warn(
-                message=f"Possible group definition indices are calculating for `{obs_key}`.",
+                message=(
+                    "Possible group definition indices are calculating "
+                    f"for `{obs_key}` for `{data_split_identifier}` set."
+                ),
                 category=UserWarning,
                 stacklevel=settings.warnings_stacklevel,
             )
@@ -189,7 +192,10 @@ class CachedPossibleGroupDefinitionIndices:
                 ]
             )
             warnings.warn(
-                message=f"Number of elements in each group for `{obs_key}`: {lengths_to_report}",
+                message=(
+                    f"Number of elements in each group for `{obs_key}` "
+                    f"in `{data_split_identifier}` set: {lengths_to_report}"
+                ),
                 category=UserWarning,
                 stacklevel=settings.warnings_stacklevel,
             )

@@ -9,10 +9,8 @@ from scvi.module.base import LossOutput, auto_move_data
 from torch.distributions import kl_divergence as kl
 
 from ._disentenglementtargetmanager import DisentenglementTargetManager
-from ._myconstants import minified_method_not_supported_message
+from ._myconstants import LOSS_MEAN_BEFORE_WEIGHT, minified_method_not_supported_message
 from ._mymoduleauxillarylosses import MyModuleAuxillaryLosses
-
-from ._DEBUG import DEBUG
 
 torch.backends.cudnn.benchmark = True
 
@@ -21,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class MyModule(VAE, MyModuleAuxillaryLosses):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, include_auxillary_loss: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
 
         # Modify `DisentenglementTargetManager` to define reserved latents in loss calculations.
@@ -43,6 +41,7 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
         DisentenglementTargetManager.configurations.latent_indices = list(range(self.n_latent))
 
         self.auxillary_losses_keys: list[str] | None = None
+        self.include_auxillary_loss = include_auxillary_loss
 
         # Remove the variable got from VAE initialization due to it is inherited from BaseMinifiedModeModuleClass.
         del self._minified_data_type
@@ -153,17 +152,22 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
         auxillary_losses = self.calculate_auxillary_losses(tensors, inference_outputs)
         if self.auxillary_losses_keys is None and len(auxillary_losses) > 0:
             self.auxillary_losses_keys = list(auxillary_losses.keys())
-        
+
         if len(auxillary_losses) > 0:
             total_auxillary_losses = torch.sum(torch.stack(list(auxillary_losses.values())), dim=0)
         else:
             total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(reconst_loss.device)
-        
-        report_auxillary_losses = {i: torch.mean(auxillary_losses[i]) for i in auxillary_losses}
-        report_auxillary_losses["mean"] = torch.mean(total_auxillary_losses)
-        
-        loss = torch.mean(reconst_loss + weighted_kl_local + total_auxillary_losses)
 
+        report_auxillary_losses = {i: torch.mean(auxillary_losses[i].clone()) for i in auxillary_losses}
+        report_auxillary_losses[LOSS_MEAN_BEFORE_WEIGHT] = torch.mean(total_auxillary_losses.clone())
+        # Test below line with different options.
+        # Note that `kl_weight` is determined dynamically depending on `n_epochs_kl_warmup` parameter.
+        total_auxillary_losses = kl_weight * total_auxillary_losses
+
+        if self.include_auxillary_loss:
+            loss = torch.mean(reconst_loss + weighted_kl_local + total_auxillary_losses)
+        else:
+            loss = torch.mean(reconst_loss + weighted_kl_local)
 
         kl_local = {
             "kl_divergence_l": kl_divergence_l,
