@@ -191,3 +191,4 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
         raise NotImplementedError
         # TODO: Calculate DEG during preprocessing.
         # TODO: filter low quality genes during preprocessing.
+        # sc.pp.filter_cells(adata, min_genes=10, inplace=True)

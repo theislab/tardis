@@ -11,7 +11,7 @@ from ._progressbarmetrics import ProgressBarMetrics
 class TardisLossSettings(BaseModel):
     apply: StrictBool
     weight: StrictFloat
-    negative_sign: StrictBool
+    transformation: StrictStr
     method: StrictStr
     progress_bar: StrictBool
     # Accepts any dict without specific type checking.
