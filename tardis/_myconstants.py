@@ -10,5 +10,5 @@ LOSS_NAMING_DELIMITER = "|"
 LOSS_NAMING_PREFIX = "tardis"
 LOSS_MEAN_BEFORE_WEIGHT = LOSS_NAMING_DELIMITER.join([LOSS_NAMING_PREFIX, "mean", "before_weight"])
 
-PROGRESS_BAR_METRICS_KEYS = {"total_loss", "kl_local"}  # "kl_local"
+PROGRESS_BAR_METRICS_KEYS = {"total_loss", "kl_local"}
 PROGRESS_BAR_METRICS_MODES = {"train"}  # "validation"

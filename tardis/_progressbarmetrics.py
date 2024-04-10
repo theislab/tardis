@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import copy
+
 from ._myconstants import PROGRESS_BAR_METRICS_KEYS, PROGRESS_BAR_METRICS_MODES
+
 
 class ProgressBarMetrics:
 
@@ -12,7 +14,7 @@ class ProgressBarMetrics:
     def reset(cls):
         cls.keys = copy.deepcopy(PROGRESS_BAR_METRICS_KEYS)
         cls.modes = copy.deepcopy(PROGRESS_BAR_METRICS_MODES)
-    
+
     @classmethod
     def add(cls, metric_name):
         try:

@@ -3,7 +3,7 @@
 import torch
 import torch.nn.functional as F
 from scvi.module.base import auto_move_data
-from torch.distributions import kl_divergence as kl
+from torch.distributions import kl_divergence
 
 from ._disentenglementtargetmanager import DisentenglementTargetManager
 from ._myconstants import REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS
@@ -59,7 +59,7 @@ class MyModuleAuxillaryLosses:
     def calculate_auxillary_loss(
         self, inference_outputs, inference_outputs_counteractive, config, relevant_latent_indices
     ):
-        if not config.apply:
+        if not config.apply:  # TODO: include warm-up epoch period
             return torch.zeros(inference_outputs["z"].shape[0]).to(inference_outputs["z"].device)
 
         latent_distribution = self.latent_distribution
@@ -72,15 +72,18 @@ class MyModuleAuxillaryLosses:
 
         elif config.method == "mse_z":
             func = self.mse_with_reparametrized_z
+
         elif config.method == "mae_z":
             func = self.mae_with_reparametrized_z
 
-        elif config.method == "kl" and latent_distribution == "normal":
+        elif config.method == "kl_qz" and latent_distribution == "normal":
             raise NotImplementedError("`kl` method with `normal` latent distribution is not implemented yet.")
-        elif config.method == "kl" and latent_distribution == "ln":
+
+        elif config.method == "kl_qz" and latent_distribution == "ln":
             raise NotImplementedError("`kl` method with `ln` latent distribution is not implemented yet.")
+
         else:
-            raise ValueError("Unknown auxillary loss method and latent distribution combination.")
+            raise ValueError("Unknown auxillary loss method.")
 
         loss = func(inference_outputs, inference_outputs_counteractive, relevant_latent_indices, **config.method_kwargs)
         return loss * config.weight * (-1 if config.negative_sign is True else +1)
@@ -98,6 +101,7 @@ class MyModuleAuxillaryLosses:
             target=inference_outputs["z"][:, relevant_latent_indices].clone(),  # pred
             reduction="none",
         ).mean(dim=1)
+        # TODO: check if clone() is needed.
 
     def wasserstein_with_normal_parameters(
         self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices, epsilon=1e-8
@@ -108,9 +112,6 @@ class MyModuleAuxillaryLosses:
         # This formula assumes that the covariance matrices are diagonal, allowing for an element-wise computation.
         # A covariance matrix is said to be diagonal if all off-diagonal elements are zero. This means that there's
         # no covariance between different dimensions—each dimension varies independently of the others.
-
-        # Note: It seems it competes with VAE's KL-loss as expected.
-        # You cannot expect the distribution to be all normal and different.
 
         qz_inference = inference_outputs["qz"]
         qz_counteractive = inference_outputs_counteractive["qz"]
@@ -128,5 +129,25 @@ class MyModuleAuxillaryLosses:
         trace_term = scale_inference_squared + scale_counteractive_squared - 2 * (scale_inference * scale_counteractive)
 
         # Just mean to get the total loss for each datapoint.
-        # The loss should note be scaled up or down based on number of relevant latents, so not sum but mean.
+        # The loss should not be scaled up or down based on number of relevant latents, so not sum but mean.
         return (mean_diff_sq + trace_term).mean(dim=1)
+
+    def kl_with_normal_parameters(
+        self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices, epsilon=1e-8
+    ):
+        pass
+        # qz_inference = inference_outputs["qz"]
+        # qz_counteractive = inference_outputs_counteractive["qz"]
+        # loc_inference = qz_inference.loc[:, relevant_latent_indices]
+        # loc_counteractive = qz_counteractive.loc[:, relevant_latent_indices]
+        # scale_inference = qz_inference.scale[:, relevant_latent_indices]
+        # scale_counteractive = qz_counteractive.scale[:, relevant_latent_indices]
+        # kl_divergence(
+        #     p=inference_outputs["qz"],
+        #     q=inference_outputs_counteractive["qz"]
+        # )
+
+    # TODO: kl-loss
+    # TODO: cosine or some other similarity based loss
+    # TODO: constrastive loss
+    # TODO: making reserved variables as multivariate normal, calculating kl accordingly?

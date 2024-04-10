@@ -54,7 +54,7 @@ class MyPlotting:
             params.extend(extra_triplets)
         params = tuple(params)
 
-        validatation_calculated = "validation_loss" in self.history
+        validatation_calculated = "total_loss_validation" in self.history
         if not validatation_calculated:
             warnings.warn(
                 message="Validation is not calculated during training.",

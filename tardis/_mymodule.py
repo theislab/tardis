@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 import logging
+import warnings
 
 import torch
-from scvi import REGISTRY_KEYS
+from scvi import REGISTRY_KEYS, settings
 from scvi.module import VAE
 from scvi.module.base import LossOutput, auto_move_data
 from torch.distributions import kl_divergence as kl
@@ -160,13 +161,19 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
 
         report_auxillary_losses = {i: torch.mean(auxillary_losses[i].clone()) for i in auxillary_losses}
         report_auxillary_losses[LOSS_MEAN_BEFORE_WEIGHT] = torch.mean(total_auxillary_losses.clone())
-        # Test below line with different options.
+
+        # TODO: Test below line with different options.
         # Note that `kl_weight` is determined dynamically depending on `n_epochs_kl_warmup` parameter.
         total_auxillary_losses = kl_weight * total_auxillary_losses
 
         if self.include_auxillary_loss:
             loss = torch.mean(reconst_loss + weighted_kl_local + total_auxillary_losses)
         else:
+            warnings.warn(
+                message="Auxillary loss is not added to the total loss. (include_auxillary_loss=False)",
+                category=UserWarning,
+                stacklevel=settings.warnings_stacklevel,
+            )
             loss = torch.mean(reconst_loss + weighted_kl_local)
 
         kl_local = {
@@ -182,3 +189,5 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
     @auto_move_data
     def calculate_r2_reconstruction(self):
         raise NotImplementedError
+        # TODO: Calculate DEG during preprocessing.
+        # TODO: filter low quality genes during preprocessing.
