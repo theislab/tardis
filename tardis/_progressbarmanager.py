@@ -5,7 +5,7 @@ import copy
 from ._myconstants import PROGRESS_BAR_METRICS_KEYS, PROGRESS_BAR_METRICS_MODES
 
 
-class ProgressBarMetrics:
+class ProgressBarManager:
 
     keys: set[str]
     modes: set[str]

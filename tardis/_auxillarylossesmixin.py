@@ -10,14 +10,14 @@ from ._disentenglementtargetmanager import DisentenglementTargetManager
 from ._myconstants import REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS
 
 
-class MyModuleAuxillaryLosses:
+class AuxillaryLossesMixin:
 
     @torch.inference_mode()
     @auto_move_data
     def inference_counteractive_minibatch(self, counteractive_minibatch_tensors):
-        inference_inputs = self._get_inference_input(counteractive_minibatch_tensors)
-        inference_outputs = self.inference(**inference_inputs)
-        return inference_outputs
+        counteractive_inference_inputs = self._get_inference_input(counteractive_minibatch_tensors)
+        counteractive_inference_outputs = self.inference(**counteractive_inference_inputs)
+        return counteractive_inference_outputs
 
     def calculate_auxillary_losses(self, tensors, inference_outputs):
 
@@ -31,11 +31,14 @@ class MyModuleAuxillaryLosses:
 
             for auxillary_loss_key in config_main.auxillary_losses.items:
                 config_individual = getattr(config_main.auxillary_losses, auxillary_loss_key)
-                relevant_latent_indices = MyModuleAuxillaryLosses.relevant_latent_indices(
+                relevant_latent_indices = AuxillaryLossesMixin.relevant_latent_indices(
                     auxillary_loss_key=auxillary_loss_key, target_obs_key_ind=target_obs_key_ind
                 )
                 loss = self.calculate_auxillary_loss(
+                    tensors=tensors,
                     inference_outputs=inference_outputs,
+                    # Note that always clone the the tensor of interest in 
+                    # `tensors` or `inference_outputs` before calculating an auxillary loss.
                     inference_outputs_counteractive=inference_outputs_counteractive,
                     config=config_individual,
                     relevant_latent_indices=relevant_latent_indices,
@@ -61,7 +64,7 @@ class MyModuleAuxillaryLosses:
             raise ValueError("Unknown auxillary loss.")
 
     def calculate_auxillary_loss(
-        self, inference_outputs, inference_outputs_counteractive, config, relevant_latent_indices
+        self, tensors, inference_outputs, inference_outputs_counteractive, config, relevant_latent_indices
     ):
         if not config.apply:  # TODO: include warm-up epoch period
             return torch.zeros(inference_outputs["z"].shape[0]).to(inference_outputs["z"].device)
@@ -91,7 +94,7 @@ class MyModuleAuxillaryLosses:
         else:
             raise ValueError("Unknown auxillary loss method.")
 
-        loss = func(inference_outputs, inference_outputs_counteractive, relevant_latent_indices, **config.method_kwargs)
+        loss = func(tensors, inference_outputs, inference_outputs_counteractive, relevant_latent_indices, **config.method_kwargs)
 
         return self.final_transformation(loss=loss, transformation_key=config.transformation) * config.weight
 
@@ -117,38 +120,38 @@ class MyModuleAuxillaryLosses:
         else:
             raise ValueError(f"Unknown transformation key in auxillary loss definition `{transformation_key}`.")
 
-    def mse_with_reparametrized_z(self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices):
+    def mse_with_reparametrized_z(self, tensors, inference_outputs, inference_outputs_counteractive, relevant_latent_indices):
         return F.mse_loss(
-            input=inference_outputs_counteractive["z"][:, relevant_latent_indices].clone(),  # true
-            target=inference_outputs["z"][:, relevant_latent_indices].clone(),  # pred
+            input=inference_outputs_counteractive["z"][:, relevant_latent_indices],  # true
+            target=inference_outputs["z"].clone()[:, relevant_latent_indices],  # pred
             reduction="none",
         ).mean(dim=1)
 
-    def mae_with_reparametrized_z(self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices):
+    def mae_with_reparametrized_z(self, tensors, inference_outputs, inference_outputs_counteractive, relevant_latent_indices):
         return F.l1_loss(
-            input=inference_outputs_counteractive["z"][:, relevant_latent_indices].clone(),  # true
-            target=inference_outputs["z"][:, relevant_latent_indices].clone(),  # pred
+            input=inference_outputs_counteractive["z"][:, relevant_latent_indices],  # true
+            target=inference_outputs["z"].clone()[:, relevant_latent_indices],  # pred
             reduction="none",
         ).mean(dim=1)
         # TODO: CHECK IF `clone()` NEEDED.
 
     def cosine_similarity_with_reparametrized_z(
-        self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices
+        self, tensors, inference_outputs, inference_outputs_counteractive, relevant_latent_indices
     ):
         return F.cosine_similarity(
-            x1=inference_outputs_counteractive["z"][:, relevant_latent_indices].clone(),
-            x2=inference_outputs["z"][:, relevant_latent_indices].clone(),
+            x1=inference_outputs_counteractive["z"][:, relevant_latent_indices],
+            x2=inference_outputs["z"].clone()[:, relevant_latent_indices],
         )
 
     def cosine_embedding_with_reparametrized_z(
-        self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices
+        self, tensors, inference_outputs, inference_outputs_counteractive, relevant_latent_indices
     ):
         raise NotImplementedError
         # return F.cosine_embedding_loss
         # reduction="none"
 
     def wasserstein_with_normal_parameters(
-        self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices, epsilon=1e-8
+        self, tensors, inference_outputs, inference_outputs_counteractive, relevant_latent_indices, epsilon=1e-8
     ):
 
         # W_{2,i}^2 = (\mu_{1,i} - \mu_{2,i})^2 + (\sigma_{1,i}^2 + \sigma_{2,i}^2 - 2 \sigma_{1,i} \sigma_{2,i})
@@ -157,7 +160,7 @@ class MyModuleAuxillaryLosses:
         # A covariance matrix is said to be diagonal if all off-diagonal elements are zero. This means that there's
         # no covariance between different dimensions—each dimension varies independently of the others.
 
-        qz_inference = inference_outputs["qz"]
+        qz_inference = inference_outputs["qz"].clone()
         qz_counteractive = inference_outputs_counteractive["qz"]
         loc_inference = qz_inference.loc[:, relevant_latent_indices]
         loc_counteractive = qz_counteractive.loc[:, relevant_latent_indices]
@@ -177,7 +180,7 @@ class MyModuleAuxillaryLosses:
         return (mean_diff_sq + trace_term).mean(dim=1)
 
     def kl_with_normal_parameters(
-        self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices, epsilon=1e-8
+        self, tensors, inference_outputs, inference_outputs_counteractive, relevant_latent_indices, epsilon=1e-8
     ):
         raise NotImplementedError
 

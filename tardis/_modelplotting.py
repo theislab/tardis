@@ -15,7 +15,7 @@ from scvi import settings
 from ._utils.warnings import ignore_predetermined_warnings
 
 
-class MyPlotting:
+class ModelPlotting:
 
     def plot_training_history(
         self,
@@ -116,29 +116,38 @@ class MyPlotting:
     def plot_latent_kde(
         self,
         adata_obs: pd.DataFrame,
-        target_obs_key: str,
         latent_representation: np.ndarray,
-        latent_dim_of_interest: int | None = None,
+        target_obs_key: str | None,
+        latent_dim_of_interest: int | None,
     ):
 
-        latent_representations_with_metadata = np.append(
-            latent_representation, adata_obs[target_obs_key].values.reshape(-1, 1), axis=1
-        )
-        df = pd.DataFrame(
-            latent_representations_with_metadata,
-            columns=[f"Latent {i}" for i in range(self.module.n_latent)] + [target_obs_key],
-        )
-        n_element = len(adata_obs[target_obs_key].unique())
+        if target_obs_key is not None:
+            latent_representations_with_metadata = np.append(
+                latent_representation, adata_obs[target_obs_key].values.reshape(-1, 1), axis=1
+            )
+            columns = [f"Latent {i}" for i in range(self.module.n_latent)] + [target_obs_key]
+        else:
+            latent_representations_with_metadata = latent_representation
+            columns = [f"Latent {i}" for i in range(self.module.n_latent)]
+
+        df = pd.DataFrame(latent_representations_with_metadata, columns=columns)
+
+        if target_obs_key is not None:
+            n_element = len(adata_obs[target_obs_key].unique())
+            kwargs = {"palette": ModelPlotting.generate_gray_tones(n_element)}
+        else:
+            kwargs = {"color": "darkgray"}
+
         individual_plot_size = 3
-        palette = MyPlotting.generate_gray_tones(n_element)
 
         if latent_dim_of_interest is not None:
 
             with ignore_predetermined_warnings():
                 plt.figure(figsize=(individual_plot_size * 1.5, individual_plot_size * 1.5))
-                sns.kdeplot(df, x=f"Latent {latent_dim_of_interest}", hue=target_obs_key, fill=True, palette=palette)
+                sns.kdeplot(df, x=f"Latent {latent_dim_of_interest}", hue=target_obs_key, fill=True, **kwargs)
                 sns.despine(top=True, right=True, left=False, bottom=False)
-                plt.legend(loc="upper right")
+                if target_obs_key is not None:
+                    plt.legend(loc="upper right")
                 plt.show()
 
         else:
@@ -163,9 +172,9 @@ class MyPlotting:
                 plot_legend = (row == 0) and (col == cols - 1 if cols > 1 else 0)
 
                 g = sns.kdeplot(
-                    data=df, x=f"Latent {i}", hue=target_obs_key, fill=True, ax=ax, palette=palette, legend=plot_legend
+                    data=df, x=f"Latent {i}", hue=target_obs_key, fill=True, ax=ax, legend=plot_legend, **kwargs
                 )
-                if plot_legend:
+                if plot_legend and target_obs_key is not None:
                     sns.move_legend(g, "upper right")
                 sns.despine(ax=ax, top=True, right=True, left=False, bottom=False)
 

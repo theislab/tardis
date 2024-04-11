@@ -5,7 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator  # ValidationError
 
 from ._myconstants import LOSS_NAMING_DELIMITER, LOSS_NAMING_PREFIX
-from ._progressbarmetrics import ProgressBarMetrics
+from ._progressbarmanager import ProgressBarManager
 
 
 class TardisLossSettings(BaseModel):
@@ -140,7 +140,7 @@ class DisentenglementTargetConfigurations(BaseModel):
             for auxillary_loss_key in config.auxillary_losses.items:
                 loss_config = getattr(config.auxillary_losses, auxillary_loss_key)
                 if loss_config.progress_bar:
-                    ProgressBarMetrics.add(loss_config.loss_identifier_string)
+                    ProgressBarManager.add(loss_config.loss_identifier_string)
 
     def __len__(self):
         return len(self.items)

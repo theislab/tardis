@@ -9,16 +9,16 @@ from scvi.module import VAE
 from scvi.module.base import LossOutput, auto_move_data
 from torch.distributions import kl_divergence as kl
 
+from ._auxillarylossesmixin import AuxillaryLossesMixin
 from ._disentenglementtargetmanager import DisentenglementTargetManager
 from ._myconstants import LOSS_MEAN_BEFORE_WEIGHT, minified_method_not_supported_message
-from ._mymoduleauxillarylosses import MyModuleAuxillaryLosses
 
 torch.backends.cudnn.benchmark = True
 
 logger = logging.getLogger(__name__)
 
 
-class MyModule(VAE, MyModuleAuxillaryLosses):
+class MyModule(VAE, AuxillaryLossesMixin):
 
     def __init__(self, *args, include_auxillary_loss: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
@@ -159,8 +159,8 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
         else:
             total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(reconst_loss.device)
 
-        report_auxillary_losses = {i: torch.mean(auxillary_losses[i].clone()) for i in auxillary_losses}
-        report_auxillary_losses[LOSS_MEAN_BEFORE_WEIGHT] = torch.mean(total_auxillary_losses.clone())
+        report_auxillary_losses = {i: torch.mean(auxillary_losses[i]) for i in auxillary_losses}
+        report_auxillary_losses[LOSS_MEAN_BEFORE_WEIGHT] = torch.mean(total_auxillary_losses)
 
         # TODO: Test below line with different options.
         # Note that `kl_weight` is determined dynamically depending on `n_epochs_kl_warmup` parameter.
@@ -184,11 +184,3 @@ class MyModule(VAE, MyModuleAuxillaryLosses):
         return LossOutput(
             loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_local, extra_metrics=report_auxillary_losses
         )
-
-    @torch.inference_mode()
-    @auto_move_data
-    def calculate_r2_reconstruction(self):
-        raise NotImplementedError
-        # TODO: Calculate DEG during preprocessing.
-        # TODO: filter low quality genes during preprocessing.
-        # sc.pp.filter_cells(adata, min_genes=10, inplace=True)

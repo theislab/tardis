@@ -7,7 +7,7 @@ from scvi.module.base import LossOutput
 from scvi.train import TrainingPlan
 from scvi.train._metrics import ElboMetric
 
-from ._progressbarmetrics import ProgressBarMetrics
+from ._progressbarmanager import ProgressBarManager
 from ._trainingsteplogger import TrainingStepLogger
 
 
@@ -39,7 +39,7 @@ class MyTrainingPlan(TrainingPlan):
         if len(key) == 0:
             raise ValueError("Key cannot be empty")
 
-        if key in ProgressBarMetrics.keys and mode in ProgressBarMetrics.modes:
+        if key in ProgressBarManager.keys and mode in ProgressBarManager.modes:
             return True
 
         return False
