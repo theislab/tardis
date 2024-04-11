@@ -85,9 +85,8 @@ class MyModuleAuxillaryLosses:
 
         elif config.method == "kl_qz" and latent_distribution == "ln":
             raise NotImplementedError("`kl` method with `ln` latent distribution is not implemented yet.")
-
-        # TODO: add other losses: cosine etc
-
+        elif config.method == "triplet":
+            func = self.triplet_loss
         else:
             raise ValueError("Unknown auxillary loss method.")
 
@@ -181,21 +180,25 @@ class MyModuleAuxillaryLosses:
     ):
         raise NotImplementedError
 
-    def _jensen_shannon_divergence_with_normal_parameters(self, dist_p, dist_q):
-        # Calculate the midpoint distribution using loc and scale
-        mean_m = 0.5 * (dist_p.loc + dist_q.loc)
-        std_m = torch.sqrt(0.5 * (dist_p.scale**2 + dist_q.scale**2))
-        dist_m = Normal(mean_m, std_m)
+    
+    def triplet_loss(self, inference_outputs, inference_outputs_counteractive, relevant_latent_indices, margin=2.):
+        
+        positive_indices = [i for i in range(inference_outputs["z"].shape[1]) if i not in relevant_latent_indices]
+    
+        positive = F.mse_loss(
+            input=inference_outputs_counteractive["z"][:, positive_indices].clone(),  # true
+            target=inference_outputs["z"][:, positive_indices].clone(),  # pred
+            reduction="none",
+        ).mean(dim=1)
+        
+        negative = F.mse_loss(
+            input=inference_outputs_counteractive["z"][:, relevant_latent_indices].clone(),  # true
+            target=inference_outputs["z"][:, relevant_latent_indices].clone(),  # pred
+            reduction="none",
+        ).mean(dim=1)
 
-        # Compute the KL divergences
-        kl_pm = kl_divergence(dist_p, dist_m)
-        kl_qm = kl_divergence(dist_q, dist_m)
-
-        # Jensen-Shannon Divergence
-        jsd = 0.5 * (kl_pm + kl_qm)
-        return jsd
-
-    # TODO: minimize mutual information
+        return torch.relu(positive - negative + margin)
+    
     # TODO: kl-loss
     # TODO: Bhattacharyya distance
     # TODO: cosine similarity and cosine embedding loss
