@@ -1,7 +1,7 @@
 import torch
 from typing import Any
 from torch.distributions import Normal
-from torch.nn.functional import kl_div
+from torch.distributions.kl import kl_divergence
 from .base import TardisLoss
 
 
@@ -12,8 +12,8 @@ def _jensen_shannon_divergence_with_normal_parameters(dist_p, dist_q):
     dist_m = Normal(mean_m, std_m)
 
     # Compute the KL divergences
-    kl_pm = kl_div(dist_p, dist_m)
-    kl_qm = kl_div(dist_q, dist_m)
+    kl_pm = kl_divergence(dist_p, dist_m)
+    kl_qm = kl_divergence(dist_q, dist_m)
 
     # Jensen-Shannon Divergence
     jsd = 0.5 * (kl_pm + kl_qm)
@@ -34,6 +34,9 @@ class JSD(TardisLoss):
             )
 
     def forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
+        self._validate_forward_inputs(
+            outputs, counteractive_outputs, relevant_latent_indices
+        )
         qz_inference = outputs["qz"].clone()
         qz_counteractive = counteractive_outputs["qz"]
 
@@ -46,4 +49,6 @@ class JSD(TardisLoss):
             qz_counteractive.scale[:, relevant_latent_indices],
         )
 
-        return _jensen_shannon_divergence_with_normal_parameters(dist_p, dist_q)
+        return self.weight * _jensen_shannon_divergence_with_normal_parameters(
+            dist_p, dist_q
+        )

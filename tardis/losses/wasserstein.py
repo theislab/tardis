@@ -1,7 +1,7 @@
 import torch
 from typing import Any
 
-from tardis.losses.base import TardisLoss
+from .base import TardisLoss
 
 
 def _wasserstein_loss_with_normal_latent_distribution(
@@ -14,7 +14,7 @@ def _wasserstein_loss_with_normal_latent_distribution(
     # A covariance matrix is said to be diagonal if all off-diagonal elements are zero. This means that there's
     # no covariance between different dimensions—each dimension varies independently of the others.
 
-    qz_inference = outputs["qz"].clone()
+    qz_inference = outputs["qz"]
     qz_counteractive = counteractive_outputs["qz"]
 
     loc_inference = qz_inference.loc[:, relevant_latent_indices]
@@ -45,34 +45,42 @@ class WassersteinLoss(TardisLoss):
     def __init__(
         self,
         weight: float,
-        transformation: str,
-        method: str,
-        progress_bar: bool | None = False,
-        latent_distribution: str | None = None,
-        kwargs: dict | None = None,
+        # transformation: str,
+        # method: str,
+        # progress_bar: bool | None = False,
+        method_kwargs: dict,
+        loss_identifier_string: str = "",
     ):
-        super().__init__(
-            weight, transformation, method, progress_bar, latent_distribution, kwargs
-        )
+        super().__init__(weight, method_kwargs, loss_identifier_string)
 
-        if self.latent_distribution is None:
+        latent_distribution = method_kwargs.get("latent_distribution", "normal")
+
+        if latent_distribution == "normal":
             self.latent_distribution = "normal"
-
-        if self.latent_distribution == "normal":
-            self._loss_fn = _wasserstein_loss_with_normal_latent_distribution
         else:
             raise NotImplementedError(
                 f"Wasserstein loss with {self.latent_distribution} latent distribution is not implemented yet."
             )
 
-        if "epsilon" in kwargs:
-            self.epsilon = kwargs["epsilon"]
+        if "epsilon" in method_kwargs:
+            self.epsilon = method_kwargs["epsilon"]
         else:
             self.epsilon = 1e-8
 
-    def forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
+    @property
+    def loss_fn(self):
+        if self.latent_distribution == "normal":
+            return _wasserstein_loss_with_normal_latent_distribution
+        else:
+            raise NotImplementedError(
+                f"Wasserstein loss with {self.latent_distribution} latent distribution is not implemented yet."
+            )
 
-        return self.loss_fn(
+    def forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
+        self._validate_forward_inputs(
+            outputs, counteractive_outputs, relevant_latent_indices
+        )
+        return self.weight * self.loss_fn(
             outputs,
             counteractive_outputs,
             relevant_latent_indices,
