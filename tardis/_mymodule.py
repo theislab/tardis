@@ -11,7 +11,10 @@ from torch.distributions import kl_divergence as kl
 
 from ._auxillarylossesmixin import AuxillaryLossesMixin
 from ._disentenglementtargetmanager import DisentenglementTargetManager
-from ._myconstants import LOSS_MEAN_BEFORE_WEIGHT, minified_method_not_supported_message
+from ._myconstants import (
+    LOSS_MEAN_BEFORE_WEIGHT,
+    minified_method_not_supported_message,
+)
 
 torch.backends.cudnn.benchmark = True
 
@@ -27,19 +30,28 @@ class MyModule(VAE, AuxillaryLossesMixin):
         self.n_total_reserved_latent = 0
         for dtconfig in DisentenglementTargetManager.configurations.items:
             dtconfig.reserved_latent_indices = list(
-                range(self.n_total_reserved_latent, self.n_total_reserved_latent + dtconfig.n_reserved_latent)
+                range(
+                    self.n_total_reserved_latent,
+                    self.n_total_reserved_latent + dtconfig.n_reserved_latent,
+                )
             )
             dtconfig.unreserved_latent_indices = [
-                i for i in range(self.n_latent) if i not in dtconfig.reserved_latent_indices
+                i
+                for i in range(self.n_latent)
+                if i not in dtconfig.reserved_latent_indices
             ]
             self.n_total_reserved_latent += dtconfig.n_reserved_latent
         if self.n_latent - self.n_total_reserved_latent < 1:
-            raise ValueError("Not enough latent space variables to reserve for targets.")
+            raise ValueError(
+                "Not enough latent space variables to reserve for targets."
+            )
         self.n_total_unreserved_latent = self.n_latent - self.n_total_reserved_latent
         DisentenglementTargetManager.configurations.unreserved_latent_indices = list(
             range(self.n_total_reserved_latent, self.n_latent)
         )  # If no target is defined, this list will contain all latent space variables.
-        DisentenglementTargetManager.configurations.latent_indices = list(range(self.n_latent))
+        DisentenglementTargetManager.configurations.latent_indices = list(
+            range(self.n_latent)
+        )
 
         self.auxillary_losses_keys: list[str] | None = None
         self.include_auxillary_loss = include_auxillary_loss
@@ -113,14 +125,18 @@ class MyModule(VAE, AuxillaryLossesMixin):
         qz, z = self.z_encoder(encoder_input, batch_index, *categorical_input)
         ql = None
         if not self.use_observed_lib_size:
-            ql, library_encoded = self.l_encoder(encoder_input, batch_index, *categorical_input)
+            ql, library_encoded = self.l_encoder(
+                encoder_input, batch_index, *categorical_input
+            )
             library = library_encoded
 
         if n_samples > 1:
             untran_z = qz.sample((n_samples,))
             z = self.z_encoder.z_transformation(untran_z)
             if self.use_observed_lib_size:
-                library = library.unsqueeze(0).expand((n_samples, library.size(0), library.size(1)))
+                library = library.unsqueeze(0).expand(
+                    (n_samples, library.size(0), library.size(1))
+                )
             else:
                 library = ql.sample((n_samples,))
         outputs = {"z": z, "qz": qz, "ql": ql, "library": library}
@@ -134,7 +150,9 @@ class MyModule(VAE, AuxillaryLossesMixin):
         kl_weight: float = 1.0,
     ):
         x = tensors[REGISTRY_KEYS.X_KEY]
-        kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(dim=-1)
+        kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(
+            dim=-1
+        )
         if not self.use_observed_lib_size:
             kl_divergence_l = kl(
                 inference_outputs["ql"],
@@ -155,12 +173,20 @@ class MyModule(VAE, AuxillaryLossesMixin):
             self.auxillary_losses_keys = list(auxillary_losses.keys())
 
         if len(auxillary_losses) > 0:
-            total_auxillary_losses = torch.sum(torch.stack(list(auxillary_losses.values())), dim=0)
+            total_auxillary_losses = torch.sum(
+                torch.stack(list(auxillary_losses.values())), dim=0
+            )
         else:
-            total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(reconst_loss.device)
+            total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(
+                reconst_loss.device
+            )
 
-        report_auxillary_losses = {i: torch.mean(auxillary_losses[i]) for i in auxillary_losses}
-        report_auxillary_losses[LOSS_MEAN_BEFORE_WEIGHT] = torch.mean(total_auxillary_losses)
+        report_auxillary_losses = {
+            i: torch.mean(auxillary_losses[i]) for i in auxillary_losses
+        }
+        report_auxillary_losses[LOSS_MEAN_BEFORE_WEIGHT] = torch.mean(
+            total_auxillary_losses
+        )
 
         # TODO: Test below line with different options.
         # Note that `kl_weight` is determined dynamically depending on `n_epochs_kl_warmup` parameter.
@@ -182,5 +208,8 @@ class MyModule(VAE, AuxillaryLossesMixin):
         }
 
         return LossOutput(
-            loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_local, extra_metrics=report_auxillary_losses
+            loss=loss,
+            reconstruction_loss=reconst_loss,
+            kl_local=kl_local,
+            extra_metrics=report_auxillary_losses,
         )

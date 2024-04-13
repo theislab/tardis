@@ -1,38 +1,19 @@
 #!/usr/bin/env python3
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
-from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator  # ValidationError
+from pydantic import (
+    BaseModel,
+    StrictBool,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
+    field_validator,
+)  # ValidationError
 
 from ._myconstants import LOSS_NAMING_DELIMITER, LOSS_NAMING_PREFIX
 from ._progressbarmanager import ProgressBarManager
-
-
-class TardisLossSettings(BaseModel):
-    apply: StrictBool
-    weight: StrictFloat
-    transformation: StrictStr
-    method: StrictStr
-    progress_bar: StrictBool
-    # Accepts any dict without specific type checking.
-    method_kwargs: dict
-    loss_identifier_string: str | None = None
-
-    @field_validator("weight")
-    def weight_must_be_positive(cls, v):
-        if v <= 0:
-            raise ValueError("`weight` must be more than or equal to 0.")
-        return v
-
-    @field_validator("loss_identifier_string")
-    def loss_identifier_string_must_undefined_before_init(cls, v):
-        if v is not None:
-            raise ValueError("`loss_identifier_string` should not be defined by the user.")
-        return v
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Add index to each configuration post-initialization
+from .losses.base import TardisLoss
 
 
 class CounteractiveMinibatchSettings(BaseModel):
@@ -45,9 +26,9 @@ class CounteractiveMinibatchSettings(BaseModel):
 
 
 class AuxillaryLosses(BaseModel):
-    complete_latent: TardisLossSettings
-    reserved_subset: TardisLossSettings
-    unreserved_subset: TardisLossSettings
+    complete_latent: Any
+    reserved_subset: Any
+    unreserved_subset: Any
     items: List[str] = {"complete_latent", "reserved_subset", "unreserved_subset"}
 
 
@@ -60,7 +41,9 @@ class DisentenglementTargetConfiguration(BaseModel):
     index: Optional[int] = None
     # This is called once during model initialization.
     reserved_latent_indices: Optional[List[int]] = None  # reserved by only this target
-    unreserved_latent_indices: Optional[List[int]] = None  # unreserved by only this target
+    unreserved_latent_indices: Optional[List[int]] = (
+        None  # unreserved by only this target
+    )
 
     @field_validator("n_reserved_latent")
     def n_reserved_latent_must_be_positive(cls, v):
@@ -77,13 +60,17 @@ class DisentenglementTargetConfiguration(BaseModel):
     @field_validator("reserved_latent_indices")
     def reserved_latent_indices_must_undefined_before_init(cls, v):
         if v is not None:
-            raise ValueError("`reserved_latent_indices` should not be defined by the user.")
+            raise ValueError(
+                "`reserved_latent_indices` should not be defined by the user."
+            )
         return v
 
     @field_validator("unreserved_latent_indices")
     def unreserved_latent_indices_must_undefined_before_init(cls, v):
         if v is not None:
-            raise ValueError("`unreserved_latent_indices` should not be defined by the user.")
+            raise ValueError(
+                "`unreserved_latent_indices` should not be defined by the user."
+            )
         return v
 
     def __init__(self, *args, **kwargs):
@@ -91,7 +78,9 @@ class DisentenglementTargetConfiguration(BaseModel):
         # Add full_name and config progress bar each configuration post-initialization
 
         for auxillary_loss_key in self.auxillary_losses.items:
-            getattr(self.auxillary_losses, auxillary_loss_key).loss_identifier_string = LOSS_NAMING_DELIMITER.join(
+            getattr(self.auxillary_losses, auxillary_loss_key)[
+                "loss_identifier_string"
+            ] = LOSS_NAMING_DELIMITER.join(
                 [LOSS_NAMING_PREFIX, self.obs_key, auxillary_loss_key]
             )
 
@@ -110,7 +99,9 @@ class DisentenglementTargetConfigurations(BaseModel):
     @field_validator("unreserved_latent_indices")
     def unreserved_latent_indices_must_undefined_before_init(cls, v):
         if v is not None:
-            raise ValueError("`unreserved_latent_indices` should not be defined by the user.")
+            raise ValueError(
+                "`unreserved_latent_indices` should not be defined by the user."
+            )
         return v
 
     @field_validator("latent_indices")
@@ -139,8 +130,8 @@ class DisentenglementTargetConfigurations(BaseModel):
         for config in self.items:
             for auxillary_loss_key in config.auxillary_losses.items:
                 loss_config = getattr(config.auxillary_losses, auxillary_loss_key)
-                if loss_config.progress_bar:
-                    ProgressBarManager.add(loss_config.loss_identifier_string)
+                if loss_config["progress_bar"]:
+                    ProgressBarManager.add(loss_config["loss_identifier_string"])
 
     def __len__(self):
         return len(self.items)

@@ -12,12 +12,13 @@ from scvi.utils import unsupported_if_adata_minified
 
 logger = logging.getLogger(__name__)
 
+
 class MetricsMixin:
 
     @torch.inference_mode()
     @unsupported_if_adata_minified
     def get_reconstruction_r2(
-        self, 
+        self,
         adata: AnnData,
         indices: Optional[Sequence[int]] = None,
         batch_size: Optional[int] = None,
@@ -26,7 +27,9 @@ class MetricsMixin:
         # TODO: Calculate DEG during preprocessing.
         # TODO: filter low quality genes during preprocessing.
         # sc.pp.filter_cells(adata, min_genes=10, inplace=True)
-        
+
         adata = self._validate_anndata(adata)
-        scdl = self._make_data_loader(adata=adata, indices=indices, batch_size=batch_size)
+        scdl = self._make_data_loader(
+            adata=adata, indices=indices, batch_size=batch_size
+        )
         raise NotImplementedError

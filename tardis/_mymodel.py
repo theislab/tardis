@@ -21,8 +21,13 @@ from scvi.dataloaders._ann_dataloader import AnnDataLoader
 from scvi.model._utils import _init_library_size
 from scvi.model.base import ArchesMixin, BaseModelClass, RNASeqMixin, VAEMixin
 
-from ._cachedpossiblegroupdefinitionindices import CachedPossibleGroupDefinitionIndices
-from ._disentenglementtargetconfigurations import DisentenglementTargetConfigurations
+from ._cachedpossiblegroupdefinitionindices import (
+    CachedPossibleGroupDefinitionIndices,
+)
+from ._disentenglementtargetconfigurations import (
+    DisentenglementTargetConfigurations,
+    DisentenglementTargetConfiguration,
+)
 from ._disentenglementtargetmanager import DisentenglementTargetManager
 from ._metricsmixin import MetricsMixin
 from ._modelplotting import ModelPlotting
@@ -37,7 +42,13 @@ logger = logging.getLogger(__name__)
 
 
 class MyModel(
-    RNASeqMixin, VAEMixin, ArchesMixin, MyUnsupervisedTrainingMixin, BaseModelClass, ModelPlotting, MetricsMixin
+    RNASeqMixin,
+    VAEMixin,
+    ArchesMixin,
+    MyUnsupervisedTrainingMixin,
+    BaseModelClass,
+    ModelPlotting,
+    MetricsMixin,
 ):
     """Tardis model"""
 
@@ -49,21 +60,29 @@ class MyModel(
         super().__init__(adata)
 
         if self._module_init_on_train:
-            raise ValueError("The model currently does not support initialization without data.")
+            raise ValueError(
+                "The model currently does not support initialization without data."
+            )
 
         self._module_kwargs = {**kwargs}
         self._model_summary_string = f"{MODEL_NAME} model"
 
         n_cats_per_cov = (
-            self.adata_manager.get_state_registry(REGISTRY_KEYS.CAT_COVS_KEY).n_cats_per_key
+            self.adata_manager.get_state_registry(
+                REGISTRY_KEYS.CAT_COVS_KEY
+            ).n_cats_per_key
             if REGISTRY_KEYS.CAT_COVS_KEY in self.adata_manager.data_registry
             else None
         )
         n_batch = self.summary_stats.n_batch
-        use_size_factor_key = REGISTRY_KEYS.SIZE_FACTOR_KEY in self.adata_manager.data_registry
+        use_size_factor_key = (
+            REGISTRY_KEYS.SIZE_FACTOR_KEY in self.adata_manager.data_registry
+        )
         library_log_means, library_log_vars = None, None
         if not use_size_factor_key:
-            library_log_means, library_log_vars = _init_library_size(self.adata_manager, n_batch)
+            library_log_means, library_log_vars = _init_library_size(
+                self.adata_manager, n_batch
+            )
 
         self.module = self._module_cls(
             n_input=self.summary_stats.n_vars,
@@ -99,7 +118,10 @@ class MyModel(
             disentenglement_targets_configurations = []
         # This also checks whether the dict follows the format required.
         disentenglement_targets_configurations = DisentenglementTargetConfigurations(
-            items=disentenglement_targets_configurations
+            items=[
+                DisentenglementTargetConfiguration(**config)
+                for config in disentenglement_targets_configurations
+            ]
         )
 
         _dtsak = disentenglement_targets_configurations.get_ordered_obs_key()
@@ -109,29 +131,51 @@ class MyModel(
             LayerField(REGISTRY_KEYS.X_KEY, layer, is_count_data=True),
             CategoricalObsField(REGISTRY_KEYS.BATCH_KEY, batch_key),
             CategoricalObsField(REGISTRY_KEYS.LABELS_KEY, labels_key),
-            NumericalObsField(REGISTRY_KEYS.SIZE_FACTOR_KEY, size_factor_key, required=False),
-            CategoricalJointObsField(REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys),
-            NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
-            CategoricalJointObsField(REGISTRY_KEY_DISENTENGLEMENT_TARGETS, disentenglement_targets_setup_anndata_keys),
+            NumericalObsField(
+                REGISTRY_KEYS.SIZE_FACTOR_KEY, size_factor_key, required=False
+            ),
+            CategoricalJointObsField(
+                REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys
+            ),
+            NumericalJointObsField(
+                REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys
+            ),
+            CategoricalJointObsField(
+                REGISTRY_KEY_DISENTENGLEMENT_TARGETS,
+                disentenglement_targets_setup_anndata_keys,
+            ),
         ]
         adata_minify_type = _get_adata_minify_type(adata)
-        assert adata_minify_type is None, f"{MODEL_NAME} model currently does not support minified data."
-        adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
+        assert (
+            adata_minify_type is None
+        ), f"{MODEL_NAME} model currently does not support minified data."
+        adata_manager = AnnDataManager(
+            fields=anndata_fields, setup_method_args=setup_method_args
+        )
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
 
         CachedPossibleGroupDefinitionIndices.reset()
-        DisentenglementTargetManager.set_configurations(value=disentenglement_targets_configurations)
+        DisentenglementTargetManager.set_configurations(
+            value=disentenglement_targets_configurations
+        )
         DisentenglementTargetManager.set_anndata_manager_state_registry(
             value={
-                registry_key: adata_manager.registry["field_registries"][registry_key]["state_registry"]
+                registry_key: adata_manager.registry["field_registries"][registry_key][
+                    "state_registry"
+                ]
                 for registry_key in adata_manager.registry["field_registries"]
                 if registry_key != REGISTRY_KEYS.X_KEY
             }
         )
 
     @classmethod
-    def setup_wandb(cls, wandb_configurations: dict, hyperparams: dict | None = None, check_credientials: bool = False):
+    def setup_wandb(
+        cls,
+        wandb_configurations: dict,
+        hyperparams: dict | None = None,
+        check_credientials: bool = False,
+    ):
         if hasattr(cls, "wandb_logger"):
             assert (
                 cls.wandb_logger.experiment._is_finished

@@ -33,7 +33,9 @@ class CounteractiveMinibatchGenerator:
             or method == "main"
             or not callable(getattr(cls, method))
         ):
-            raise AttributeError(f"{cls.__name__} does not have a callable attribute '{method}'.")
+            raise AttributeError(
+                f"{cls.__name__} does not have a callable attribute '{method}'."
+            )
         else:
             class_function = getattr(cls, method)
             return class_function(target_obs_key_ind=target_obs_key_ind, **kwargs)
@@ -56,21 +58,29 @@ class CounteractiveMinibatchGenerator:
         minibatch_relative_index: list[int],
     ) -> list[int]:
 
-        config = DisentenglementTargetManager.configurations.items[target_obs_key_ind].counteractive_minibatch_settings
+        config = DisentenglementTargetManager.configurations.items[
+            target_obs_key_ind
+        ].counteractive_minibatch_settings
         possible_indices = CachedPossibleGroupDefinitionIndices.get(
-            dataset_tensors, target_obs_key_ind, data_split_identifier, splitter_index, config
+            dataset_tensors,
+            target_obs_key_ind,
+            data_split_identifier,
+            splitter_index,
+            config,
         )
         minibatch_definitions = DatapointDefinitionsKeyGenerator.create_definitions(
             minibatch_tensors, target_obs_key_ind, config
         ).numpy()  # as it returns a tensor originally.
 
         rng = np.random.default_rng(  # Seeded RNG for consistency
-            seed=CounteractiveMinibatchGenerator.configuration_random_seed(config.method_kwargs["seed"])
+            seed=CounteractiveMinibatchGenerator.configuration_random_seed(
+                config.method_kwargs["seed"]
+            )
         )
 
-        n_cat = DisentenglementTargetManager.anndata_manager_state_registry["disentenglement_target"]["n_cats_per_key"][
-            target_obs_key_ind
-        ]
+        n_cat = DisentenglementTargetManager.anndata_manager_state_registry[
+            "disentenglement_target"
+        ]["n_cats_per_key"][target_obs_key_ind]
         # Randomization of the first element (`group_definitions`) if `within_other_groups` is on.
         # Further explanation of why is given in `create_definitions` method.
         if config.method_kwargs["within_other_groups"]:
@@ -78,7 +88,8 @@ class CounteractiveMinibatchGenerator:
             random_ints = rng.integers(0, n_cat, size=minibatch_definitions.shape[0])
             minibatch_definitions[:, indice_group_definitions] = np.where(
                 random_ints == minibatch_definitions[:, indice_group_definitions],
-                (random_ints + 1) % n_cat,  # if random integer is the same as the original
+                (random_ints + 1)
+                % n_cat,  # if random integer is the same as the original
                 random_ints,  # use random integers
             )
 

@@ -3,7 +3,10 @@
 import torch.utils.data._utils
 from scvi.dataloaders import DataSplitter
 from scvi.dataloaders._ann_dataloader import AnnDataLoader
-from torch.utils.data.dataloader import _BaseDataLoaderIter, _SingleProcessDataLoaderIter
+from torch.utils.data.dataloader import (
+    _BaseDataLoaderIter,
+    _SingleProcessDataLoaderIter,
+)
 
 from ._counteractiveminibatchgenerator import CounteractiveMinibatchGenerator
 from ._disentenglementtargetmanager import DisentenglementTargetManager
@@ -41,11 +44,17 @@ class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
                     # Note that this is index of `self._dataset.indices`, not the index of real full dataset.
                     minibatch_relative_index=index,
                 )
-                target_obs_key_tensors = self._dataset_fetcher.fetch(target_obs_key_tensors_indices)
-                data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key] = target_obs_key_tensors
+                target_obs_key_tensors = self._dataset_fetcher.fetch(
+                    target_obs_key_tensors_indices
+                )
+                data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][
+                    target_obs_key
+                ] = target_obs_key_tensors
 
         if self._pin_memory:
-            data = torch.utils.data._utils.pin_memory.pin_memory(data, self._pin_memory_device)
+            data = torch.utils.data._utils.pin_memory.pin_memory(
+                data, self._pin_memory_device
+            )
         return data
 
 
@@ -57,7 +66,9 @@ class MyAnnDataLoader(AnnDataLoader):
 
     def _get_iterator(self) -> "_BaseDataLoaderIter":  # torch.DataLoader method
         if self.num_workers == 0:
-            return _MySingleProcessDataLoaderIter(loader=self, data_split_identifier=self.data_split_identifier)
+            return _MySingleProcessDataLoaderIter(
+                loader=self, data_split_identifier=self.data_split_identifier
+            )
         else:
             raise NotImplementedError(
                 f"Multiprocessed data loaader not implemented for {MODEL_NAME} model. "
@@ -126,9 +137,18 @@ class MyDataSplitter(DataSplitter):
                     for deep_key, deep_val in val.items():
                         # `deep_deep_key` is registry keys for counteractive minibatch
                         for deep_deep_key, deep_deep_val in deep_val.items():
-                            deep_deep_layout = deep_deep_val.layout if isinstance(deep_deep_val, torch.Tensor) else None
-                            if deep_deep_layout is torch.sparse_csr or deep_deep_layout is torch.sparse_csc:
-                                batch[key][deep_key][deep_deep_key] = deep_deep_val.to_dense()
+                            deep_deep_layout = (
+                                deep_deep_val.layout
+                                if isinstance(deep_deep_val, torch.Tensor)
+                                else None
+                            )
+                            if (
+                                deep_deep_layout is torch.sparse_csr
+                                or deep_deep_layout is torch.sparse_csc
+                            ):
+                                batch[key][deep_key][
+                                    deep_deep_key
+                                ] = deep_deep_val.to_dense()
                 else:
                     layout = val.layout if isinstance(val, torch.Tensor) else None
                     if layout is torch.sparse_csr or layout is torch.sparse_csc:

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 
-from ._disentenglementtargetconfigurations import DisentenglementTargetConfigurations
+from ._disentenglementtargetconfigurations import (
+    DisentenglementTargetConfigurations,
+)
 
 
 class DisentenglementTargetManager:
