@@ -45,9 +45,6 @@ class WassersteinLoss(TardisLoss):
     def __init__(
         self,
         weight: float,
-        # transformation: str,
-        # method: str,
-        # progress_bar: bool | None = False,
         method_kwargs: dict,
         loss_identifier_string: str = "",
     ):

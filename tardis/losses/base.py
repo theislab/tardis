@@ -10,19 +10,12 @@ class TardisLoss(nn.Module, ABC):
 
     def __init__(
         self,
-        # method: str,
         weight: float,
-        # transformation: str,
-        # progress_bar: bool,
-        # Accepts any dict without specific type checking.
         method_kwargs: dict,
         loss_identifier_string: Optional[str] = "",
     ):
         super(TardisLoss, self).__init__()
-        # self.method = method
         self.weight = weight
-        # self.transformation = transformation
-        # self.progress_bar = progress_bar
         self.method_kwargs = method_kwargs
         self.loss_identifier_string = loss_identifier_string
 
