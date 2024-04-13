@@ -4,16 +4,17 @@ from typing import Any, List, Optional
 
 from pydantic import (
     BaseModel,
-    StrictBool,
-    StrictFloat,
     StrictInt,
     StrictStr,
     field_validator,
 )  # ValidationError
 
-from ._myconstants import LOSS_NAMING_DELIMITER, LOSS_NAMING_PREFIX
+from ._myconstants import (
+    LOSS_NAMING_DELIMITER,
+    LOSS_NAMING_PREFIX,
+    LATENT_INDEX_GROUP_NAMES,
+)
 from ._progressbarmanager import ProgressBarManager
-from .losses.base import TardisLoss
 
 
 class CounteractiveMinibatchSettings(BaseModel):
@@ -29,7 +30,7 @@ class AuxillaryLosses(BaseModel):
     complete_latent: Any
     reserved_subset: Any
     unreserved_subset: Any
-    items: List[str] = {"complete_latent", "reserved_subset", "unreserved_subset"}
+    # items: List[str] = {"complete_latent", "reserved_subset", "unreserved_subset"}
 
 
 class DisentenglementTargetConfiguration(BaseModel):
@@ -75,14 +76,6 @@ class DisentenglementTargetConfiguration(BaseModel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Add full_name and config progress bar each configuration post-initialization
-
-        for auxillary_loss_key in self.auxillary_losses.items:
-            getattr(self.auxillary_losses, auxillary_loss_key)[
-                "loss_identifier_string"
-            ] = LOSS_NAMING_DELIMITER.join(
-                [LOSS_NAMING_PREFIX, self.obs_key, auxillary_loss_key]
-            )
 
 
 class DisentenglementTargetConfigurations(BaseModel):
@@ -124,14 +117,16 @@ class DisentenglementTargetConfigurations(BaseModel):
         # Add index to each configuration post-initialization
         for index, config in enumerate(self.items):
             config.index = index
-        for config in self.items:
             self._index_to_obs_key[config.index] = config.obs_key
             self._obs_key_to_index[config.obs_key] = config.index
-        for config in self.items:
-            for auxillary_loss_key in config.auxillary_losses.items:
+
+            for auxillary_loss_key in LATENT_INDEX_GROUP_NAMES:
                 loss_config = getattr(config.auxillary_losses, auxillary_loss_key)
+                loss_identifier_string = LOSS_NAMING_DELIMITER.join(
+                    [LOSS_NAMING_PREFIX, config.obs_key, auxillary_loss_key]
+                )
                 if loss_config["progress_bar"]:
-                    ProgressBarManager.add(loss_config["loss_identifier_string"])
+                    ProgressBarManager.add(loss_identifier_string)
 
     def __len__(self):
         return len(self.items)

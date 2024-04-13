@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 MODEL_NAME = "tardis"
-REGISTRY_KEY_DISENTENGLEMENT_TARGETS = "disentenglement_target"
-REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS = "disentenglement_target_tensors"
+REGISTRY_KEY_DISENTENGLEMENT_TARGETS = "disentanglement_target"
+REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS = "disentanglement_target_tensors"
 
 minified_method_not_supported_message = (
     f"{MODEL_NAME} model currently does not support minified data."
@@ -16,3 +16,4 @@ LOSS_MEAN_BEFORE_WEIGHT = LOSS_NAMING_DELIMITER.join(
 
 PROGRESS_BAR_METRICS_KEYS = {"total_loss", "kl_local"}
 PROGRESS_BAR_METRICS_MODES = {"train"}  # "validation"
+LATENT_INDEX_GROUP_NAMES = ["complete_latent", "reserved_subset", "unreserved_subset"]

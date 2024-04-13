@@ -169,6 +169,7 @@ class MyModule(VAE, AuxillaryLossesMixin):
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
         auxillary_losses = self.calculate_auxillary_losses(tensors, inference_outputs)
+
         if self.auxillary_losses_keys is None and len(auxillary_losses) > 0:
             self.auxillary_losses_keys = list(auxillary_losses.keys())
 

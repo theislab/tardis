@@ -79,7 +79,7 @@ class CounteractiveMinibatchGenerator:
         )
 
         n_cat = DisentenglementTargetManager.anndata_manager_state_registry[
-            "disentenglement_target"
+            "disentanglement_target"
         ]["n_cats_per_key"][target_obs_key_ind]
         # Randomization of the first element (`group_definitions`) if `within_other_groups` is on.
         # Further explanation of why is given in `create_definitions` method.

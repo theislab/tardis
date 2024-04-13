@@ -16,7 +16,10 @@ import torch.nn.functional as F
 from scvi.module.base import auto_move_data
 
 from ._disentenglementtargetmanager import DisentenglementTargetManager
-from ._myconstants import REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS
+from ._myconstants import (
+    REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS,
+    LATENT_INDEX_GROUP_NAMES,
+)
 from .losses import LOSSES
 
 TRANSFORMATIONS = {
@@ -58,7 +61,7 @@ class AuxillaryLossesMixin:
                 target_obs_key_ind
             )
 
-            for auxillary_loss_key in config.auxillary_losses.items:
+            for auxillary_loss_key in LATENT_INDEX_GROUP_NAMES:
                 loss_config = getattr(config.auxillary_losses, auxillary_loss_key)
                 relevant_latent_indices = AuxillaryLossesMixin.relevant_latent_indices(
                     auxillary_loss_key=auxillary_loss_key,
@@ -86,13 +89,7 @@ class AuxillaryLossesMixin:
 
                 loss_fn = LOSSES[method](
                     weight=loss_config["weight"],
-                    # method=loss_config["method"],
                     method_kwargs=loss_config["method_kwargs"],
-                    # transformation=loss_config["transformation"],
-                    # progress_bar=loss_config["progress_bar"],
-                    loss_identifier_string=loss_config.get(
-                        "loss_identifier_string", ""
-                    ),
                 )
 
                 loss = TRANSFORMATIONS[loss_config["transformation"]](
@@ -101,7 +98,6 @@ class AuxillaryLossesMixin:
                         # Note that always clone the the tensor of interest in
                         # `tensors` or `inference_outputs` before calculating an auxillary loss.
                         counteractive_outputs=inference_outputs_counteractive,
-                        # config=loss_config,
                         relevant_latent_indices=relevant_latent_indices,
                     )
                 )
