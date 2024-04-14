@@ -9,6 +9,7 @@ from ._cachedpossiblegroupdefinitionindices import (
     DatapointDefinitionsKeyGenerator,
 )
 from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._myconstants import NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY
 from ._trainingsteplogger import TrainingStepLogger
 
 
@@ -60,41 +61,45 @@ class CounteractiveMinibatchGenerator:
         possible_indices = CachedPossibleGroupDefinitionIndices.get(
             dataset_tensors, target_obs_key_ind, data_split_identifier, splitter_index, config
         )
-        minibatch_definitions = DatapointDefinitionsKeyGenerator.create_definitions(
-            minibatch_tensors, target_obs_key_ind, config
-        ).numpy()  # as it returns a tensor originally.
+        minibatch_definitions = (
+            DatapointDefinitionsKeyGenerator.create_definitions(minibatch_tensors, target_obs_key_ind, config)
+            .clone()  # prevent misbehavior at below randomization operation. testing needed for method training speed.
+            .numpy()  # as it returns a tensor originally.
+        )
+
+        selection = {POSITIVE_EXAMPLE_KEY: minibatch_definitions.copy(), NEGATIVE_EXAMPLE_KEY: None}
 
         rng = np.random.default_rng(  # Seeded RNG for consistency
             seed=CounteractiveMinibatchGenerator.configuration_random_seed(config.method_kwargs["seed"])
         )
-
         n_cat = DisentenglementTargetManager.anndata_manager_state_registry["disentenglement_target"]["n_cats_per_key"][
             target_obs_key_ind
         ]
-        # Randomization of the first element (`group_definitions`) if `within_other_groups` is on.
-        # Further explanation of why is given in `create_definitions` method.
-        if config.method_kwargs["within_other_groups"]:
-            indice_group_definitions = 0
-            random_ints = rng.integers(0, n_cat, size=minibatch_definitions.shape[0])
-            minibatch_definitions[:, indice_group_definitions] = np.where(
-                random_ints == minibatch_definitions[:, indice_group_definitions],
-                (random_ints + 1) % n_cat,  # if random integer is the same as the original
-                random_ints,  # use random integers
-            )
+        indice_group_definitions = 0
+        random_ints = rng.integers(0, n_cat, size=minibatch_definitions.shape[0])
+        minibatch_definitions[:, indice_group_definitions] = np.where(
+            random_ints == minibatch_definitions[:, indice_group_definitions],
+            (random_ints + 1) % n_cat,  # if random integer is the same as the original
+            random_ints,  # use random integers
+        )
+        selection[NEGATIVE_EXAMPLE_KEY] = minibatch_definitions
 
-        selected_elements = []
-        for datapoint in minibatch_definitions:
-            try:
-                selected_elements.append(rng.choice(possible_indices[tuple(datapoint)]))
-            except KeyError as e:
-                to_report = {i: len(possible_indices[i]) for i in possible_indices}
-                raise KeyError(
-                    f"The minibatch definition `{tuple(datapoint)}` is not found in possible cached indice "
-                    f"dictionary.The keys of this dict is `{to_report}` (given as key and number of elements within)."
-                    "It happens when the `within` statements are so strict, giving rise to there is no "
-                    "corresponding element with such a configuration in the original dataset.In general, "
-                    "please note that `within_batch` is the most frequent problem as it is actually correlated with "
-                    "many possible metadatas directly."
-                ) from e
+        selected_elements = dict()
+        for selection_key, selection_minibatch_definitions in selection.items():
+            _selected_elements = []
+            for datapoint in selection_minibatch_definitions:
+                try:
+                    _selected_elements.append(rng.choice(possible_indices[tuple(datapoint)]))
+                except KeyError as e:
+                    to_report = {i: len(possible_indices[i]) for i in possible_indices}
+                    raise KeyError(
+                        f"The minibatch definition `{tuple(datapoint)}` is not found in possible cached indice "
+                        f"dictionary.The keys of this dict is `{to_report}` (given as key and number of elements "
+                        "within). It happens when the `within` statements are so strict, giving rise to there is no "
+                        "corresponding element with such a configuration in the original dataset.In general, "
+                        "please note that `within_batch` is the most frequent problem as it is actually "
+                        "correlated with many possible metadatas directly."
+                    ) from e
+            selected_elements[selection_key] = _selected_elements
 
         return selected_elements

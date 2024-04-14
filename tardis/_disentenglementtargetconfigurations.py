@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator  # ValidationError
 
-from ._myconstants import LOSS_NAMING_DELIMITER, LOSS_NAMING_PREFIX
+from ._myconstants import EXAMPLE_KEYS, LATENT_INDEX_GROUP_NAMES, LOSS_NAMING_DELIMITER, LOSS_NAMING_PREFIX
 from ._progressbarmanager import ProgressBarManager
 
 
@@ -14,9 +14,19 @@ class TardisLossSettings(BaseModel):
     transformation: StrictStr
     method: StrictStr
     progress_bar: StrictBool
+    latent_group: StrictStr
+    counteractive_example: StrictStr
     # Accepts any dict without specific type checking.
     method_kwargs: dict
+    # This is set after the initialization based on the index of the target in the provided list.
+    index: int | None = None
     loss_identifier_string: str | None = None
+
+    @field_validator("index")
+    def index_must_undefined_before_init(cls, v):
+        if v is not None:
+            raise ValueError("`index` should not be defined by the user.")
+        return v
 
     @field_validator("weight")
     def weight_must_be_positive(cls, v):
@@ -28,6 +38,18 @@ class TardisLossSettings(BaseModel):
     def loss_identifier_string_must_undefined_before_init(cls, v):
         if v is not None:
             raise ValueError("`loss_identifier_string` should not be defined by the user.")
+        return v
+
+    @field_validator("latent_group")
+    def latent_group_must_be_defined_in_constants(cls, v):
+        if v not in LATENT_INDEX_GROUP_NAMES:
+            raise ValueError(f"`latent_group` (`{v}`) should be one of `{LATENT_INDEX_GROUP_NAMES}`.")
+        return v
+
+    @field_validator("counteractive_example")
+    def counteractive_example_must_be_defined_in_constants(cls, v):
+        if v not in EXAMPLE_KEYS:
+            raise ValueError(f"`counteractive_example` (`{v}`) should be one of `{EXAMPLE_KEYS}`.")
         return v
 
     def __init__(self, *args, **kwargs):
@@ -45,17 +67,23 @@ class CounteractiveMinibatchSettings(BaseModel):
 
 
 class AuxillaryLosses(BaseModel):
-    complete_latent: TardisLossSettings
-    reserved_subset: TardisLossSettings
-    unreserved_subset: TardisLossSettings
-    items: List[str] = {"complete_latent", "reserved_subset", "unreserved_subset"}
+    items: List[TardisLossSettings] = []
+
+    def __len__(self):
+        return len(self.items)
+
+    def get_by_identifier(self, identifier: str) -> TardisLossSettings:
+        for item in self.items:
+            if item.loss_identifier_string == identifier:
+                return item
+        raise KeyError("`identifier` is not amongst the defined losses.")
 
 
 class DisentenglementTargetConfiguration(BaseModel):
     obs_key: StrictStr
     n_reserved_latent: StrictInt
     counteractive_minibatch_settings: CounteractiveMinibatchSettings
-    auxillary_losses: AuxillaryLosses
+    auxillary_losses: List[TardisLossSettings] = []
     # This is set after the initialization based on the index of the target in the provided list.
     index: Optional[int] = None
     # This is called once during model initialization.
@@ -90,9 +118,10 @@ class DisentenglementTargetConfiguration(BaseModel):
         super().__init__(*args, **kwargs)
         # Add full_name and config progress bar each configuration post-initialization
 
-        for auxillary_loss_key in self.auxillary_losses.items:
-            getattr(self.auxillary_losses, auxillary_loss_key).loss_identifier_string = LOSS_NAMING_DELIMITER.join(
-                [LOSS_NAMING_PREFIX, self.obs_key, auxillary_loss_key]
+        for index, auxillary_loss in enumerate(self.auxillary_losses):
+            auxillary_loss.index = index
+            auxillary_loss.loss_identifier_string = LOSS_NAMING_DELIMITER.join(
+                [LOSS_NAMING_PREFIX, self.obs_key, str(auxillary_loss.index)]
             )
 
 
@@ -137,10 +166,9 @@ class DisentenglementTargetConfigurations(BaseModel):
             self._index_to_obs_key[config.index] = config.obs_key
             self._obs_key_to_index[config.obs_key] = config.index
         for config in self.items:
-            for auxillary_loss_key in config.auxillary_losses.items:
-                loss_config = getattr(config.auxillary_losses, auxillary_loss_key)
-                if loss_config.progress_bar:
-                    ProgressBarManager.add(loss_config.loss_identifier_string)
+            for auxillary_loss in config.auxillary_losses:
+                if auxillary_loss.progress_bar:
+                    ProgressBarManager.add(auxillary_loss.loss_identifier_string)
 
     def __len__(self):
         return len(self.items)
