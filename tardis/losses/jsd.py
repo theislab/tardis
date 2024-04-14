@@ -5,39 +5,13 @@ from torch.distributions.kl import kl_divergence
 from .base import TardisLoss
 
 
-def _jensen_shannon_divergence_with_normal_parameters(dist_p, dist_q):
-    # Calculate the midpoint distribution using loc and scale
-    mean_m = 0.5 * (dist_p.loc + dist_q.loc)
-    std_m = torch.sqrt(0.5 * (dist_p.scale**2 + dist_q.scale**2))
-    dist_m = Normal(mean_m, std_m)
-
-    # Compute the KL divergences
-    kl_pm = kl_divergence(dist_p, dist_m)
-    kl_qm = kl_divergence(dist_q, dist_m)
-
-    # Jensen-Shannon Divergence
-    jsd = 0.5 * (kl_pm + kl_qm)
-    return jsd
-
-
-class JSD(TardisLoss):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.latent_distribution is None:
-            self.latent_distribution = "normal"
-
-        if self.latent_distribution == "normal":
-            self._jsd = JSD
-        else:
-            raise NotImplementedError(
-                f"JSD with {self.latent_distribution} latent distribution is not implemented yet."
-            )
+class JSDNormal(TardisLoss):
 
     def forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
         self._validate_forward_inputs(
             outputs, counteractive_outputs, relevant_latent_indices
         )
-        qz_inference = outputs["qz"].clone()
+        qz_inference = outputs["qz"]
         qz_counteractive = counteractive_outputs["qz"]
 
         dist_p = Normal(
@@ -49,6 +23,37 @@ class JSD(TardisLoss):
             qz_counteractive.scale[:, relevant_latent_indices],
         )
 
-        return self.weight * _jensen_shannon_divergence_with_normal_parameters(
-            dist_p, dist_q
+        # Calculate the midpoint distribution using loc and scale
+        mean_m = 0.5 * (dist_p.loc + dist_q.loc)
+        std_m = torch.sqrt(0.5 * (dist_p.scale**2 + dist_q.scale**2))
+        dist_m = Normal(mean_m, std_m)
+
+        # Compute the KL divergences
+        kl_pm = kl_divergence(dist_p, dist_m)
+        kl_qm = kl_divergence(dist_q, dist_m)
+
+        # Jensen-Shannon Divergence
+        jsd = 0.5 * (kl_pm + kl_qm)
+        return self.weight * jsd
+
+
+class JSD(TardisLoss):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.latent_distribution = kwargs.get("latent_distribution", "normal")
+
+        if self.latent_distribution == "normal":
+            self._jsd = JSDNormal(*args, **kwargs)
+        else:
+            raise NotImplementedError(
+                f"JSD with {self.latent_distribution} latent distribution is not implemented yet."
+            )
+
+    def forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
+        self._validate_forward_inputs(
+            outputs, counteractive_outputs, relevant_latent_indices
+        )
+        return self._jsd.forward(
+            outputs, counteractive_outputs, relevant_latent_indices
         )
