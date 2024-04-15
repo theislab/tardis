@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from ._utils.preprocessing import NA_CELL_TYPE_PLACEHOLDER, RANK_GENES_GROUPS_KEY  # noqa
+
 MODEL_NAME = "tardis"
 REGISTRY_KEY_DISENTENGLEMENT_TARGETS = "disentenglement_target"
 REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS = "disentenglement_target_tensors"

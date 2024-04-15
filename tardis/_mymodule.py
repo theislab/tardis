@@ -11,6 +11,7 @@ from torch.distributions import kl_divergence as kl
 
 from ._auxillarylossesmixin import AuxillaryLossesMixin
 from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._metricsmixin import ModuleMetricsMixin
 from ._myconstants import LOSS_MEAN_BEFORE_WEIGHT, minified_method_not_supported_message
 
 torch.backends.cudnn.benchmark = True
@@ -18,7 +19,7 @@ torch.backends.cudnn.benchmark = True
 logger = logging.getLogger(__name__)
 
 
-class MyModule(VAE, AuxillaryLossesMixin):
+class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
 
     def __init__(self, *args, include_auxillary_loss: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
