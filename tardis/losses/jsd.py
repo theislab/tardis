@@ -34,7 +34,7 @@ class JSDNormal(TardisLoss):
 
         # Jensen-Shannon Divergence
         jsd = 0.5 * (kl_pm + kl_qm)
-        return self.weight * jsd
+        return self.weight * self.transformation(jsd)
 
 
 class JSD(TardisLoss):

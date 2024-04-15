@@ -9,7 +9,9 @@ class CosineSimilarity(TardisLoss):
         self._validate_forward_inputs(
             outputs, counteractive_outputs, relevant_latent_indices
         )
-        return self.weight * F.cosine_similarity(
-            x1=outputs["z"][:, relevant_latent_indices],
-            x2=counteractive_outputs["z"].clone()[:, relevant_latent_indices],
+        return self.weight * self.transformation(
+            F.cosine_similarity(
+                x1=outputs["z"][:, relevant_latent_indices],
+                x2=counteractive_outputs["z"].clone()[:, relevant_latent_indices],
+            )
         )

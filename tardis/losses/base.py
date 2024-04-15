@@ -1,23 +1,32 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Dict
 
 
 import torch
+import torch.nn.functional as F
 import torch.nn as nn
+
+
+TRANSFORMATIONS = {
+    "none": lambda x: x,
+    "identity": lambda x: x,
+    "negative": torch.neg,
+    "sigmoid": F.sigmoid,
+    "inverse": lambda x: 1 / (x + 1),
+    "exponential_decay": lambda x: torch.exp(-x),
+    "tanh": F.tanh,
+}
 
 
 class TardisLoss(nn.Module, ABC):
 
     def __init__(
-        self,
-        weight: float,
-        method_kwargs: dict,
-        loss_identifier_string: Optional[str] = "",
+        self, weight: float, method_kwargs: dict, transformation: str = "none"
     ):
         super(TardisLoss, self).__init__()
         self.weight = weight
         self.method_kwargs = method_kwargs
-        self.loss_identifier_string = loss_identifier_string
+        self.transformation = TRANSFORMATIONS[transformation]
 
     def _validate_forward_inputs(
         self, outputs, counteractive_outputs, relevant_latent_indices

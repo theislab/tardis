@@ -43,12 +43,9 @@ def _wasserstein_loss_with_normal_latent_distribution(
 
 class WassersteinLoss(TardisLoss):
     def __init__(
-        self,
-        weight: float,
-        method_kwargs: dict,
-        loss_identifier_string: str = "",
+        self, weight: float, method_kwargs: dict, transformation: str = "none"
     ):
-        super().__init__(weight, method_kwargs, loss_identifier_string)
+        super().__init__(weight, method_kwargs, transformation)
 
         latent_distribution = method_kwargs.get("latent_distribution", "normal")
 
@@ -77,9 +74,11 @@ class WassersteinLoss(TardisLoss):
         self._validate_forward_inputs(
             outputs, counteractive_outputs, relevant_latent_indices
         )
-        return self.weight * self.loss_fn(
-            outputs,
-            counteractive_outputs,
-            relevant_latent_indices,
-            epsilon=self.epsilon,
+        return self.weight * self.transformation(
+            self.loss_fn(
+                outputs,
+                counteractive_outputs,
+                relevant_latent_indices,
+                epsilon=self.epsilon,
+            )
         )
