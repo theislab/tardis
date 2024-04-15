@@ -9,7 +9,7 @@ from torch.utils.data.dataloader import (
 )
 
 from ._counteractiveminibatchgenerator import CounteractiveMinibatchGenerator
-from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._disentenglementtargetmanager import DisentanglementTargetManager
 from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS
 
 
@@ -23,13 +23,13 @@ class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
         index = self._next_index()  # may raise StopIteration
         data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
 
-        if len(DisentenglementTargetManager.configurations) > 0:
+        if len(DisentanglementTargetManager.disentanglements) > 0:
             data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS] = dict()
             # `data` is simply the minibatch itself.
             # The aim is create alternative minibatches that has the same keys as the original one
             # These minibatches, called counteractive minibatch, will be fed through `forward` method.
             for target_obs_key_ind, target_obs_key in enumerate(
-                DisentenglementTargetManager.configurations.get_ordered_obs_key()
+                DisentanglementTargetManager.get_ordered_disentanglement_keys()
             ):
                 target_obs_key_tensors_indices = CounteractiveMinibatchGenerator.main(
                     target_obs_key_ind=target_obs_key_ind,

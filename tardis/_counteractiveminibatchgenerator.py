@@ -8,7 +8,7 @@ from ._cachedpossiblegroupdefinitionindices import (
     CachedPossibleGroupDefinitionIndices,
     DatapointDefinitionsKeyGenerator,
 )
-from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._disentenglementtargetmanager import DisentanglementTargetManager
 from ._trainingsteplogger import TrainingStepLogger
 
 
@@ -25,7 +25,7 @@ class CounteractiveMinibatchGenerator:
         - method: Name of the method to use for generating the minibatch.
         - **kwargs: Keyword arguments passed to the method, including method-specific kwargs and common parameters.
         """
-        method = DisentenglementTargetManager.configurations.get_by_index(
+        method = DisentanglementTargetManager.get_disentanglement(
             target_obs_key_ind
         ).counteractive_minibatch_settings.method
         if (
@@ -58,7 +58,7 @@ class CounteractiveMinibatchGenerator:
         minibatch_relative_index: list[int],
     ) -> list[int]:
 
-        config = DisentenglementTargetManager.configurations.items[
+        config = DisentanglementTargetManager.disentanglements[
             target_obs_key_ind
         ].counteractive_minibatch_settings
         possible_indices = CachedPossibleGroupDefinitionIndices.get(
@@ -78,7 +78,7 @@ class CounteractiveMinibatchGenerator:
             )
         )
 
-        n_cat = DisentenglementTargetManager.anndata_manager_state_registry[
+        n_cat = DisentanglementTargetManager.anndata_manager_state_registry[
             "disentanglement_target"
         ]["n_cats_per_key"][target_obs_key_ind]
         # Randomization of the first element (`group_definitions`) if `within_other_groups` is on.

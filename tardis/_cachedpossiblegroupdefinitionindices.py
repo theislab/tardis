@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from scvi import REGISTRY_KEYS, settings
 
-from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._disentenglementtargetmanager import DisentanglementTargetManager
 from ._myconstants import REGISTRY_KEY_DISENTENGLEMENT_TARGETS
 
 
@@ -145,7 +145,7 @@ class CachedPossibleGroupDefinitionIndices:
             )
 
         ecc = copy.deepcopy(
-            DisentenglementTargetManager.anndata_manager_state_registry[
+            DisentanglementTargetManager.anndata_manager_state_registry[
                 REGISTRY_KEYS.CAT_COVS_KEY
             ]
         )
@@ -226,7 +226,7 @@ class CachedPossibleGroupDefinitionIndices:
                 raise ValueError(
                     "The `reset` method should be called in the beginning."
                 )
-            obs_key = DisentenglementTargetManager.configurations.get_by_index(
+            obs_key = DisentanglementTargetManager.get_disentanglement(
                 target_obs_key_ind
             ).obs_key
             warnings.warn(
