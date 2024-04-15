@@ -24,11 +24,8 @@ from scvi.model.base import ArchesMixin, BaseModelClass, RNASeqMixin, VAEMixin
 from ._cachedpossiblegroupdefinitionindices import (
     CachedPossibleGroupDefinitionIndices,
 )
-from ._disentenglementtargetconfigurations import (
-    DisentenglementTargetConfigurations,
-    DisentenglementTargetConfiguration,
-)
-from ._disentenglementtargetmanager import DisentenglementTargetManager
+
+from ._disentenglementtargetmanager import DisentanglementTargetManager
 from ._metricsmixin import MetricsMixin
 from ._modelplotting import ModelPlotting
 from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
@@ -55,6 +52,7 @@ class MyModel(
     _module_cls = MyModule
     # Keep the original AnndataLoader for everything else other than training.
     _data_loader_cls = AnnDataLoader
+    _disentanglement_manager_cls = DisentanglementTargetManager
 
     def __init__(self, adata: AnnData, **kwargs):
         super().__init__(adata)
@@ -95,7 +93,7 @@ class MyModel(
             library_log_vars=library_log_vars,
             **kwargs,
         )
-
+        self._disentanglement_manager_cls.set_indices(n_latent=self.module.n_latent)
         self.init_params_ = self._get_init_params(locals())
 
     @classmethod
@@ -114,18 +112,17 @@ class MyModel(
         setup_method_args = cls._get_setup_method_args(**locals())
 
         ProgressBarManager.reset()
+
         if disentenglement_targets_configurations is None:
             disentenglement_targets_configurations = []
-        # This also checks whether the dict follows the format required.
-        disentenglement_targets_configurations = DisentenglementTargetConfigurations(
-            items=[
-                DisentenglementTargetConfiguration(**config)
-                for config in disentenglement_targets_configurations
-            ]
-        )
 
-        _dtsak = disentenglement_targets_configurations.get_ordered_obs_key()
-        disentenglement_targets_setup_anndata_keys = _dtsak if len(_dtsak) > 0 else None
+        cls._disentanglement_manager_cls.set_disentanglements(
+            disentenglement_targets_configurations
+        )
+        obs_keys = cls._disentanglement_manager_cls.get_ordered_disentanglement_keys()
+        disentanglement_targets_setup_anndata_keys = (
+            obs_keys if len(obs_keys) > 0 else None
+        )
 
         anndata_fields = [
             LayerField(REGISTRY_KEYS.X_KEY, layer, is_count_data=True),
@@ -142,7 +139,7 @@ class MyModel(
             ),
             CategoricalJointObsField(
                 REGISTRY_KEY_DISENTENGLEMENT_TARGETS,
-                disentenglement_targets_setup_anndata_keys,
+                disentanglement_targets_setup_anndata_keys,
             ),
         ]
         adata_minify_type = _get_adata_minify_type(adata)
@@ -156,10 +153,8 @@ class MyModel(
         cls.register_manager(adata_manager)
 
         CachedPossibleGroupDefinitionIndices.reset()
-        DisentenglementTargetManager.set_configurations(
-            value=disentenglement_targets_configurations
-        )
-        DisentenglementTargetManager.set_anndata_manager_state_registry(
+
+        cls._disentanglement_manager_cls.set_anndata_manager_state_registry(
             value={
                 registry_key: adata_manager.registry["field_registries"][registry_key][
                     "state_registry"

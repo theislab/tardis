@@ -16,4 +16,4 @@ LOSS_MEAN_BEFORE_WEIGHT = LOSS_NAMING_DELIMITER.join(
 
 PROGRESS_BAR_METRICS_KEYS = {"total_loss", "kl_local"}
 PROGRESS_BAR_METRICS_MODES = {"train"}  # "validation"
-LATENT_INDEX_GROUP_NAMES = ["complete_latent", "reserved_subset", "unreserved_subset"]
+LOSS_TYPES = ["complete", "reserved", "unreserved"]
