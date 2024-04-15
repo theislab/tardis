@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import sys
-from scanpy.tools import rank_genes_groups as sc_rank_genes_groups
+import warnings
+
 import numpy as np
 import pandas as pd
 import scipy
-import warnings
-
+from scanpy.tools import rank_genes_groups as sc_rank_genes_groups
 
 NA_CELL_TYPE_PLACEHOLDER = "NA"
 RANK_GENES_GROUPS_KEY = "rank_genes_groups"
@@ -39,7 +39,7 @@ def deep_memory_usage(obj, seen=None):
 
 def select_hvgs(adata_var, top_gene_number, min_mean, max_mean):
     assert not np.isnan(adata_var["means"]).any(), "There are `nan`s in the HVG."
-    
+
     count_removed = 0
     if isinstance(min_mean, int) or isinstance(min_mean, float):
         _mim = min_mean < adata_var["means"]
@@ -47,37 +47,33 @@ def select_hvgs(adata_var, top_gene_number, min_mean, max_mean):
         adata_var = adata_var[_mim]
     else:
         assert min_mean is None
-        
+
     if isinstance(max_mean, int) or isinstance(max_mean, float):
         _mam = adata_var["means"] < max_mean
         count_removed += np.sum(~_mam)
         adata_var = adata_var[_mam]
     else:
         assert max_mean is None
-        
+
     passed_thresholding = adata_var.index.copy()
-    
+
     # sort genes by how often they selected as hvg within each batch and
     # break ties with normalized dispersion across batches. as the original function does.
     adata_var["dispersions_norm"] = adata_var["dispersions_norm"].astype("float32")
-    if "highly_variable_nbatches" in adata_var.columns:        
+    if "highly_variable_nbatches" in adata_var.columns:
         adata_var.sort_values(
-            ['highly_variable_nbatches', 'dispersions_norm'],
+            ["highly_variable_nbatches", "dispersions_norm"],
             ascending=False,
-            na_position='last',
+            na_position="last",
             inplace=True,
-            ignore_index=False
+            ignore_index=False,
         )
     else:
         warnings.warn("`highly_variable_nbatches` is not found. Only `dispersions_norm` will be used.")
         adata_var.sort_values(
-            ['dispersions_norm'],
-            ascending=False,
-            na_position='last',
-            inplace=True,
-            ignore_index=False
+            ["dispersions_norm"], ascending=False, na_position="last", inplace=True, ignore_index=False
         )
-    
+
     if top_gene_number is None:
         top_gene_number = len(adata_var)
     elif len(adata_var) < top_gene_number:

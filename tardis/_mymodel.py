@@ -131,7 +131,13 @@ class MyModel(
         )
 
     @classmethod
-    def setup_wandb(cls, wandb_configurations: dict, hyperparams: dict | None = None, check_credientials: bool = False):
+    def setup_wandb(
+        cls,
+        wandb_configurations: dict,
+        hyperparams: dict | None = None,
+        check_credientials: bool = False,
+        verbose: bool = True,
+    ):
         if hasattr(cls, "wandb_logger"):
             assert (
                 cls.wandb_logger.experiment._is_finished
@@ -158,3 +164,4 @@ class MyModel(
             cls.wandb_logger = WandbLogger(
                 config=hyperparams, **wandb_configurations["wandblogger_kwargs"]
             )  # cls.wandb_logger.experiment.id
+            cls.wandb_logger_verbose = verbose
