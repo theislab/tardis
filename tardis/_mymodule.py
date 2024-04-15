@@ -1,4 +1,15 @@
-#!/usr/bin/env python3
+# TODO: minimize mutual information
+# TODO: kl-loss
+# TODO: Bhattacharyya distance
+# TODO: cosine similarity and cosine embedding loss
+# TODO: some other similarity based loss
+# TODO: constrastive loss: F.triplet_margin_loss, F.triplet_margin_with_distance_loss
+# TODO: making reserved variables as multivariate normal, calculating kl accordingly?
+
+# Notes:
+# - When only reserved is active for `sex`, you have two blob at the end.
+# - When unreserved loss is also active you have one blob.
+# - The second makes sure the same cell types are put together as we have `within_label` option activated.
 
 import logging
 import warnings
@@ -9,8 +20,7 @@ from scvi.module import VAE
 from scvi.module.base import LossOutput, auto_move_data
 from torch.distributions import kl_divergence as kl
 
-from ._auxillarylossesmixin import AuxillaryLossesMixin
-from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._disentenglementtargetmanager import DisentanglementTargetManager
 from ._myconstants import (
     LOSS_MEAN_BEFORE_WEIGHT,
     minified_method_not_supported_message,
@@ -21,40 +31,14 @@ torch.backends.cudnn.benchmark = True
 logger = logging.getLogger(__name__)
 
 
-class MyModule(VAE, AuxillaryLossesMixin):
+class MyModule(VAE):
 
     def __init__(self, *args, include_auxillary_loss: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # Modify `DisentenglementTargetManager` to define reserved latents in loss calculations.
-        self.n_total_reserved_latent = 0
-        for dtconfig in DisentenglementTargetManager.configurations.items:
-            dtconfig.reserved_latent_indices = list(
-                range(
-                    self.n_total_reserved_latent,
-                    self.n_total_reserved_latent + dtconfig.n_reserved_latent,
-                )
-            )
-            dtconfig.unreserved_latent_indices = [
-                i
-                for i in range(self.n_latent)
-                if i not in dtconfig.reserved_latent_indices
-            ]
-            self.n_total_reserved_latent += dtconfig.n_reserved_latent
-        if self.n_latent - self.n_total_reserved_latent < 1:
-            raise ValueError(
-                "Not enough latent space variables to reserve for targets."
-            )
-        self.n_total_unreserved_latent = self.n_latent - self.n_total_reserved_latent
-        DisentenglementTargetManager.configurations.unreserved_latent_indices = list(
-            range(self.n_total_reserved_latent, self.n_latent)
-        )  # If no target is defined, this list will contain all latent space variables.
-        DisentenglementTargetManager.configurations.latent_indices = list(
-            range(self.n_latent)
-        )
-
         self.auxillary_losses_keys: list[str] | None = None
         self.include_auxillary_loss = include_auxillary_loss
+
+        # Modify `DisentenglementTargetManager` to define reserved latents in loss calculations.
 
         # Remove the variable got from VAE initialization due to it is inherited from BaseMinifiedModeModuleClass.
         del self._minified_data_type
@@ -142,6 +126,17 @@ class MyModule(VAE, AuxillaryLossesMixin):
         outputs = {"z": z, "qz": qz, "ql": ql, "library": library}
         return outputs
 
+    @torch.inference_mode()
+    @auto_move_data
+    def inference_counteractive_minibatch(self, counteractive_minibatch_tensors):
+        counteractive_inference_inputs = self._get_inference_input(
+            counteractive_minibatch_tensors
+        )
+        counteractive_inference_outputs = self.inference(
+            **counteractive_inference_inputs
+        )
+        return counteractive_inference_outputs
+
     def loss(
         self,
         tensors,
@@ -168,7 +163,15 @@ class MyModule(VAE, AuxillaryLossesMixin):
 
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
-        auxillary_losses = self.calculate_auxillary_losses(tensors, inference_outputs)
+        if len(DisentanglementTargetManager.disentanglements) > 0:
+            counteractive_inference_outputs = self.inference_counteractive_minibatch(
+                tensors
+            )
+            auxillary_losses = DisentanglementTargetManager.get_loss(
+                inference_outputs, counteractive_inference_outputs
+            )
+        else:
+            total_auxillary_losses = {}
 
         if self.auxillary_losses_keys is None and len(auxillary_losses) > 0:
             self.auxillary_losses_keys = list(auxillary_losses.keys())
@@ -181,9 +184,8 @@ class MyModule(VAE, AuxillaryLossesMixin):
             total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(
                 reconst_loss.device
             )
-
         report_auxillary_losses = {
-            i: torch.mean(auxillary_losses[i]) for i in auxillary_losses
+            k: torch.mean(v) for k, v in auxillary_losses.items()
         }
         report_auxillary_losses[LOSS_MEAN_BEFORE_WEIGHT] = torch.mean(
             total_auxillary_losses
