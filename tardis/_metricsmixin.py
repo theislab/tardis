@@ -177,10 +177,9 @@ class MetricsMixin:
         # 0 if all genes should be considered
         top_n_differentially_expressed_genes: int = 0,
         min_item_for_calculation: int = 10,
-        aggregate_method_datapoints: Literal[
-            "variance_weighted", "uniform_average", "flatten", "mean"
-        ] = "variance_weighted",
-        verbose: bool = True,
+        aggregate_method_datapoints: Literal["variance_weighted", "uniform_average", "flatten", "mean"] = "mean",
+        verbose: bool = False,
+        debug: bool = False,
     ) -> float:
         """Get reconstruction performance by R2 score."""
         adata = self._validate_anndata(adata if adata is not None else self.adata_manager.adata)
@@ -202,13 +201,14 @@ class MetricsMixin:
         for tensors in tqdm.tqdm(scdl) if verbose else scdl:
             pred = (
                 self.module.my_sample(tensors=tensors, latent_space=False, return_dist=False, n_samples=1)
+                .cpu()
                 .numpy()
                 .mean(axis=0)  # aggregate 'n_sample's
             )
-            true = tensors[REGISTRY_KEYS.X_KEY].numpy()
+            true = tensors[REGISTRY_KEYS.X_KEY].cpu().numpy()
 
             if top_n_differentially_expressed_genes != 0:
-                cell_type_list = tensors[REGISTRY_KEYS.LABELS_KEY].view(-1).numpy()
+                cell_type_list = tensors[REGISTRY_KEYS.LABELS_KEY].view(-1).cpu().numpy()
                 if NA_CELL_TYPE_PLACEHOLDER in labels_full_name:
                     cell_type_is_not_na = cell_type_list != labels_full_name[NA_CELL_TYPE_PLACEHOLDER]
                 else:
@@ -237,9 +237,12 @@ class MetricsMixin:
 
             values.append(r2)
 
+            if debug:
+                return true, pred, r2
+
         return np.mean(values)
 
-    # TODO:
+    # TODO: implement distentenglement measures
     # How do you define disentenglement. Look at papers.
     # Intuitive idea: run sklearn classifiers on the data, test their accuracy, with and without tardis loss
     #     for reserved and unreserved latent spaces

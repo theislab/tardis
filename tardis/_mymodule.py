@@ -12,7 +12,7 @@ from torch.distributions import kl_divergence as kl
 from ._auxillarylossesmixin import AuxillaryLossesMixin
 from ._disentenglementtargetmanager import DisentenglementTargetManager
 from ._metricsmixin import ModuleMetricsMixin
-from ._myconstants import LOSS_MEAN_BEFORE_WEIGHT, minified_method_not_supported_message
+from ._myconstants import AUXILLARY_LOSS_MEAN, minified_method_not_supported_message
 
 torch.backends.cudnn.benchmark = True
 
@@ -149,6 +149,7 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
         kl_local_for_warmup = kl_divergence_z
         kl_local_no_warmup = kl_divergence_l
 
+        # Note that `kl_weight` is determined dynamically depending on `n_epochs_kl_warmup` parameter.
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
         auxillary_losses = self.calculate_auxillary_losses(tensors, inference_outputs)
@@ -161,11 +162,7 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
             total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(reconst_loss.device)
 
         report_auxillary_losses = {i: torch.mean(auxillary_losses[i]) for i in auxillary_losses}
-        report_auxillary_losses[LOSS_MEAN_BEFORE_WEIGHT] = torch.mean(total_auxillary_losses)
-
-        # TODO: Test below line with different options.
-        # Note that `kl_weight` is determined dynamically depending on `n_epochs_kl_warmup` parameter.
-        total_auxillary_losses = kl_weight * total_auxillary_losses
+        report_auxillary_losses[AUXILLARY_LOSS_MEAN] = torch.mean(total_auxillary_losses)
 
         if self.include_auxillary_loss:
             loss = torch.mean(reconst_loss + weighted_kl_local + total_auxillary_losses)

@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from scvi.module.base import auto_move_data
 from torch.distributions import Normal, kl_divergence
 
+from ._auxillarylosswarmupmanager import AuxillaryLossWarmupManager
 from ._DEBUG import DEBUG
 from ._disentenglementtargetmanager import DisentenglementTargetManager
 from ._myconstants import (
@@ -14,10 +15,13 @@ from ._myconstants import (
     LATENT_INDEX_GROUP_COMPLETE,
     LATENT_INDEX_GROUP_RESERVED,
     LATENT_INDEX_GROUP_UNRESERVED,
+    LATENT_INDEX_GROUP_UNRESERVED_COMPLETE,
     NEGATIVE_EXAMPLE_KEY,
     POSITIVE_EXAMPLE_KEY,
+    REGISTRY_KEY_DISENTENGLEMENT_TARGETS,
     REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS,
 )
+from ._trainingsteplogger import TrainingEpochLogger
 
 
 class FinalTransformation:
@@ -60,17 +64,22 @@ class AuxillaryLossesMixin:
 
             # Although sometimes `inference_counteractive_positive` or `inference_counteractive_negative` are not
             # used at all, calculate for coding simplicity. Needs optimization for deployment.
-            inference_counteractive_positive = self.inference_counteractive_minibatch(
-                tensors[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key][POSITIVE_EXAMPLE_KEY]
-            )
-            inference_counteractive_negative = self.inference_counteractive_minibatch(
-                tensors[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key][NEGATIVE_EXAMPLE_KEY]
-            )
+            tensors_positive = tensors[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key][
+                POSITIVE_EXAMPLE_KEY
+            ]
+            inference_counteractive_positive = self.inference_counteractive_minibatch(tensors_positive)
+
+            tensors_negative = tensors[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key][
+                NEGATIVE_EXAMPLE_KEY
+            ]
+            inference_counteractive_negative = self.inference_counteractive_minibatch(tensors_negative)
 
             config_main = DisentenglementTargetManager.configurations.get_by_index(target_obs_key_ind)
             for config_individual in config_main.auxillary_losses:
                 loss = self.calculate_auxillary_loss(
                     t=tensors,
+                    tp=tensors_positive,
+                    tn=tensors_negative,
                     i=target_obs_key_ind,
                     io=inference_outputs,
                     iop=inference_counteractive_positive,
@@ -92,10 +101,13 @@ class AuxillaryLossesMixin:
             LATENT_INDEX_GROUP_UNRESERVED: DisentenglementTargetManager.configurations.get_by_index(
                 target_obs_key_ind
             ).unreserved_latent_indices,
+            LATENT_INDEX_GROUP_UNRESERVED_COMPLETE: (
+                DisentenglementTargetManager.configurations.unreserved_latent_indices
+            ),
         }
 
-    def calculate_auxillary_loss(self, t, i, io, iop, ion, c, rli):
-        if not c.apply:  # TODO: include warm-up epoch period
+    def calculate_auxillary_loss(self, t, tp, tn, i, io, iop, ion, c, rli):
+        if not c.apply:
             return torch.zeros(io["z"].shape[0]).to(io["z"].device)
 
         if c.method == "wasserstein_qz" and self.latent_distribution == "normal":
@@ -125,13 +137,37 @@ class AuxillaryLossesMixin:
         else:
             raise ValueError("Unknown auxillary loss method.")
 
-        loss = func(
-            t=t, i=i, io=io, iop=iop, ion=ion, rli=rli, lg=c.latent_group, ce=c.counteractive_example, **c.method_kwargs
+        loss = func(t=t, tp=tp, tn=tn, i=i, io=io, iop=iop, ion=ion, rli=rli, c=c, **c.method_kwargs)
+
+        return (
+            FinalTransformation.get(key=c.transformation)(loss=loss)
+            * c.weight
+            * AuxillaryLossWarmupManager.get(  # changes depending on epoch, scaled between [0, 1]
+                key=c.loss_identifier_string, epoch=TrainingEpochLogger.current
+            )
+            * self.pseudo_categorical_coefficient_calculator(i=i, t=t, tn=tn, tp=tp, c=c)
         )
 
-        return FinalTransformation.get(key=c.transformation)(loss=loss) * c.weight
+    def pseudo_categorical_coefficient_calculator(self, i, t, tn, tp, c):
+        if c.target_type == "categorical":
+            return 1.0
 
-    def mse_with_reparametrized_z(self, t, i, io, iop, ion, rli, ce, lg):
+        elif c.target_type == "pseudo_categorical":
+            if c.pseudo_categorical_coefficient_method == "substract":
+                # TODO: complete the class method:
+                # get tensor column from t[REGISTRY_KEY_DISENTENGLEMENT_TARGETS][i]
+                # get tensor column for `tn` or `tp`
+                # get real values using `DisentenglementTargetManager.anndata_manager_state_registry`
+                # substract
+                raise NotImplementedError
+            else:
+                raise ValueError("Unknown `pseudo_categorical_coefficient_method`.")
+        else:
+            raise ValueError("Unknown `target_type`.")
+
+    def mse_with_reparametrized_z(self, t, tp, tn, i, io, iop, ion, rli, c):
+        lg = c.latent_group
+        ce = c.counteractive_example
         if ce in [NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY]:
             return F.mse_loss(
                 input=(ion if ce == NEGATIVE_EXAMPLE_KEY else iop)["z"][:, rli[lg]],  # true
@@ -143,7 +179,9 @@ class AuxillaryLossesMixin:
         else:
             raise ValueError("Undefined counteractive example key.")
 
-    def mae_with_reparametrized_z(self, t, i, io, iop, ion, rli, ce, lg):
+    def mae_with_reparametrized_z(self, t, tp, tn, i, io, iop, ion, rli, c):
+        lg = c.latent_group
+        ce = c.counteractive_example
         if ce in [NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY]:
             return F.l1_loss(
                 input=(ion if ce == NEGATIVE_EXAMPLE_KEY else iop)["z"][:, rli[lg]],  # true
@@ -155,7 +193,9 @@ class AuxillaryLossesMixin:
         else:
             raise ValueError("Undefined counteractive example key.")
 
-    def cosine_similarity_with_reparametrized_z(self, t, i, io, iop, ion, rli, ce, lg):
+    def cosine_similarity_with_reparametrized_z(self, t, tp, tn, i, io, iop, ion, rli, c):
+        lg = c.latent_group
+        ce = c.counteractive_example
         if ce in [NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY]:
             return F.cosine_similarity(
                 x1=(ion if ce == NEGATIVE_EXAMPLE_KEY else iop)["z"][:, rli[lg]],  # true
@@ -167,7 +207,9 @@ class AuxillaryLossesMixin:
         else:
             raise ValueError("Undefined counteractive example key.")
 
-    def cosine_embedding_with_reparametrized_z(self, t, i, io, iop, ion, rli, ce, lg):
+    def cosine_embedding_with_reparametrized_z(self, t, tp, tn, i, io, iop, ion, rli, c):
+        lg = c.latent_group
+        # ce = c.counteractive_example
         DEBUG.x1 = ion["z"][:, rli[lg]]
         DEBUG.x2 = io["z"][:, rli[lg]]
 
@@ -175,13 +217,16 @@ class AuxillaryLossesMixin:
 
         raise NotImplementedError  # F.cosine_embedding_loss
 
-    def wasserstein_with_normal_parameters(self, t, i, io, iop, ion, rli, ce, lg, epsilon=1e-8):
+    def wasserstein_with_normal_parameters(self, t, tp, tn, i, io, iop, ion, rli, c, epsilon=1e-8):
 
         # W_{2,i}^2 = (\mu_{1,i} - \mu_{2,i})^2 + (\sigma_{1,i}^2 + \sigma_{2,i}^2 - 2 \sigma_{1,i} \sigma_{2,i})
 
         # This formula assumes that the covariance matrices are diagonal, allowing for an element-wise computation.
         # A covariance matrix is said to be diagonal if all off-diagonal elements are zero. This means that there's
         # no covariance between different dimensions—each dimension varies independently of the others.
+
+        lg = c.latent_group
+        ce = c.counteractive_example
 
         qz_inference = io["qz"]
         qz_counteractive = (ion if ce == NEGATIVE_EXAMPLE_KEY else iop)["qz"]
@@ -202,7 +247,7 @@ class AuxillaryLossesMixin:
         # The loss should not be scaled up or down based on number of relevant latents, so not sum but mean.
         return (mean_diff_sq + trace_term).mean(dim=1)
 
-    def kl_with_normal_parameters(self, t, io, iop, ion, rli, ce, lg):
+    def kl_with_normal_parameters(self, t, tp, tn, io, iop, ion, rli, c):
         raise NotImplementedError
 
     def _jensen_shannon_divergence_with_normal_parameters(self, dist_p, dist_q):
@@ -225,7 +270,9 @@ class AuxillaryLossesMixin:
     # TODO: cosine similarity and cosine embedding loss
     # TODO: some other similarity based loss
     # TODO: constrastive loss: F.triplet_margin_loss, F.triplet_margin_with_distance_loss
-    # TODO: making reserved variables as multivariate normal, calculating kl accordingly?
+    # TODO: define which losses satisfy triangle inequality
+
+    # - making reserved variables as multivariate normal, calculating kl accordingly?
 
     # Notes:
     # - When only reserved is active for `sex`, you have two blob at the end.

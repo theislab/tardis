@@ -1,26 +1,55 @@
 #!/usr/bin/env python3
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator  # ValidationError
 
+from ._auxillarylosswarmupmanager import AuxillaryLossWarmupManager
 from ._myconstants import EXAMPLE_KEYS, LATENT_INDEX_GROUP_NAMES, LOSS_NAMING_DELIMITER, LOSS_NAMING_PREFIX
 from ._progressbarmanager import ProgressBarManager
 
 
-class TardisLossSettings(BaseModel):
+class TardisLoss(BaseModel):
     apply: StrictBool
+    target_type: Literal["categorical", "pseudo_categorical"]
+    warmup_epoch_range: List[int] | None
     weight: StrictFloat
     transformation: StrictStr
     method: StrictStr
     progress_bar: StrictBool
     latent_group: StrictStr
     counteractive_example: StrictStr
+    # if type is pseudo_categorical this should be set to something
+    pseudo_categorical_coefficient_method: str | None = None
     # Accepts any dict without specific type checking.
     method_kwargs: dict
     # This is set after the initialization based on the index of the target in the provided list.
     index: int | None = None
     loss_identifier_string: str | None = None
+
+    @field_validator("pseudo_categorical_coefficient_method", "target_type")
+    def pseudo_categorical_coefficient_method_must_be_defined_for_pseudo_categorical_loss(cls, v, u):
+        if u == "pseudo_categorical" and not isinstance(v, str):
+            raise ValueError(
+                "`pseudo_categorical_coefficient_method` should be defined if `target_type` is `pseudo_categorical`."
+            )
+        elif u != "pseudo_categorical" and v is not None:
+            raise ValueError(
+                "`pseudo_categorical_coefficient_method` should be `None` if `target_type` is not `pseudo_categorical`."
+            )
+        return v
+
+    @field_validator("warmup_epoch_range")
+    def warmup_epoch_range_must_have_two_length(cls, v):
+        if (
+            v is not None
+            or not isinstance(v, list)
+            or len(v) != 2
+            or not all([isinstance(k, int) for k in v])
+            or not v[0] <= v[1]
+        ):
+            raise ValueError("`warmup_epoch_range` should be `None` or list of integers with lenght 2.")
+        return v
 
     @field_validator("index")
     def index_must_undefined_before_init(cls, v):
@@ -67,12 +96,12 @@ class CounteractiveMinibatchSettings(BaseModel):
 
 
 class AuxillaryLosses(BaseModel):
-    items: List[TardisLossSettings] = []
+    items: List[TardisLoss] = []
 
     def __len__(self):
         return len(self.items)
 
-    def get_by_identifier(self, identifier: str) -> TardisLossSettings:
+    def get_by_identifier(self, identifier: str) -> TardisLoss:
         for item in self.items:
             if item.loss_identifier_string == identifier:
                 return item
@@ -83,7 +112,7 @@ class DisentenglementTargetConfiguration(BaseModel):
     obs_key: StrictStr
     n_reserved_latent: StrictInt
     counteractive_minibatch_settings: CounteractiveMinibatchSettings
-    auxillary_losses: List[TardisLossSettings] = []
+    auxillary_losses: List[TardisLoss] = []
     # This is set after the initialization based on the index of the target in the provided list.
     index: Optional[int] = None
     # This is called once during model initialization.
@@ -169,6 +198,7 @@ class DisentenglementTargetConfigurations(BaseModel):
             for auxillary_loss in config.auxillary_losses:
                 if auxillary_loss.progress_bar:
                     ProgressBarManager.add(auxillary_loss.loss_identifier_string)
+                AuxillaryLossWarmupManager.add(auxillary_loss.loss_identifier_string, auxillary_loss.warmup_epoch_range)
 
     def __len__(self):
         return len(self.items)
