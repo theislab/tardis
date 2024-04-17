@@ -100,6 +100,9 @@ class MyModel(
         TrainingEpochLogger.reset()
         AuxillaryLossWarmupManager.reset()
         ProgressBarManager.reset()
+        DisentenglementTargetManager.reset()
+        CachedPossibleGroupDefinitionIndices.reset()
+
         if disentenglement_targets_configurations is None:
             disentenglement_targets_configurations = []
         # This also checks whether the dict follows the format required.
@@ -125,7 +128,6 @@ class MyModel(
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
 
-        CachedPossibleGroupDefinitionIndices.reset()
         DisentenglementTargetManager.set_configurations(value=disentenglement_targets_configurations)
         DisentenglementTargetManager.set_anndata_manager_state_registry(
             value={

@@ -2,14 +2,16 @@
 
 from typing import Dict, List
 
+import numpy as np
 import torch
 import torch.nn.functional as F
+from scvi import REGISTRY_KEYS
 from scvi.module.base import auto_move_data
 from torch.distributions import Normal, kl_divergence
 
 from ._auxillarylosswarmupmanager import AuxillaryLossWarmupManager
 from ._DEBUG import DEBUG
-from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._disentenglementtargetmanager import DisentenglementTargetManager as DTM
 from ._myconstants import (
     BOTH_EXAMPLE_KEY,
     LATENT_INDEX_GROUP_COMPLETE,
@@ -58,9 +60,7 @@ class AuxillaryLossesMixin:
 
         weighted_result = dict()
         result = dict()
-        for target_obs_key_ind, target_obs_key in enumerate(
-            DisentenglementTargetManager.configurations.get_ordered_obs_key()
-        ):
+        for target_obs_key_ind, target_obs_key in enumerate(DTM.configurations.get_ordered_obs_key()):
             relevant_latent_indices = AuxillaryLossesMixin.relevant_latent_indices(target_obs_key_ind)
 
             # Although sometimes `inference_counteractive_positive` or `inference_counteractive_negative` are not
@@ -75,7 +75,7 @@ class AuxillaryLossesMixin:
             ]
             inference_counteractive_negative = self.inference_counteractive_minibatch(tensors_negative)
 
-            config_main = DisentenglementTargetManager.configurations.get_by_index(target_obs_key_ind)
+            config_main = DTM.configurations.get_by_index(target_obs_key_ind)
             for config_individual in config_main.auxillary_losses:
                 weighted_loss, loss = self.calculate_auxillary_loss(
                     t=tensors,
@@ -96,21 +96,17 @@ class AuxillaryLossesMixin:
     @staticmethod
     def relevant_latent_indices(target_obs_key_ind) -> Dict[str, List[int]]:
         return {
-            LATENT_INDEX_GROUP_COMPLETE: DisentenglementTargetManager.configurations.latent_indices,
-            LATENT_INDEX_GROUP_RESERVED: DisentenglementTargetManager.configurations.get_by_index(
-                target_obs_key_ind
-            ).reserved_latent_indices,
-            LATENT_INDEX_GROUP_UNRESERVED: DisentenglementTargetManager.configurations.get_by_index(
+            LATENT_INDEX_GROUP_COMPLETE: DTM.configurations.latent_indices,
+            LATENT_INDEX_GROUP_RESERVED: DTM.configurations.get_by_index(target_obs_key_ind).reserved_latent_indices,
+            LATENT_INDEX_GROUP_UNRESERVED: DTM.configurations.get_by_index(
                 target_obs_key_ind
             ).unreserved_latent_indices,
-            LATENT_INDEX_GROUP_UNRESERVED_COMPLETE: (
-                DisentenglementTargetManager.configurations.unreserved_latent_indices
-            ),
+            LATENT_INDEX_GROUP_UNRESERVED_COMPLETE: (DTM.configurations.unreserved_latent_indices),
         }
 
     def calculate_auxillary_loss(self, t, tp, tn, i, io, iop, ion, c, rli):
         if not c.apply:
-            return torch.zeros(io["z"].shape[0]).to(io["z"].device)
+            return torch.zeros(t[REGISTRY_KEYS.X_KEY].shape[0]).to(t[REGISTRY_KEYS.X_KEY].device)
 
         if c.method == "wasserstein_qz" and self.latent_distribution == "normal":
             func = self.wasserstein_with_normal_parameters
@@ -141,12 +137,8 @@ class AuxillaryLossesMixin:
 
         loss = func(t=t, tp=tp, tn=tn, i=i, io=io, iop=iop, ion=ion, rli=rli, c=c, **c.method_kwargs)
 
-        loss = (
-            FinalTransformation.get(key=c.transformation)(loss=loss)
-            * c.weight
-            * self.pseudo_categorical_coefficient_calculator(i=i, t=t, tn=tn, tp=tp, c=c)
-        )
-
+        elementwise_coefficient = self.pseudo_categorical_coefficient_calculator(i=i, t=t, tn=tn, tp=tp, c=c)
+        loss = FinalTransformation.get(key=c.transformation)(loss=loss) * c.weight * elementwise_coefficient
         weighted_loss = loss * AuxillaryLossWarmupManager.get(  # changes depending on epoch, scaled between [0, 1]
             key=c.loss_identifier_string, epoch=TrainingEpochLogger.current
         )
@@ -154,61 +146,85 @@ class AuxillaryLossesMixin:
         return weighted_loss, loss.detach()  # loss just for reporting
 
     def pseudo_categorical_coefficient_calculator(self, i, t, tn, tp, c):
+        device = t[REGISTRY_KEYS.X_KEY].device
         if c.target_type == "categorical":
-            return 1.0
+            return torch.ones(t[REGISTRY_KEYS.X_KEY].shape[0]).to(device)
 
         elif c.target_type == "pseudo_categorical":
-            if c.non_categorical_coefficient_method == "substract":
-                # TODO: complete the class method:
-                # get tensor column from t[REGISTRY_KEY_DISENTENGLEMENT_TARGETS][i]
-                # get tensor column for `tn` or `tp`
-                # get real values using `DisentenglementTargetManager.anndata_manager_state_registry`
-                # substract
-                raise NotImplementedError
+
+            ce = c.counteractive_example
+            if ce != NEGATIVE_EXAMPLE_KEY:
+                raise ValueError(
+                    "The pseudo-categorical coefficient calculation will get two same vector if counteractive "
+                    "example is not negative. This coefficients makes sense only for negative counteractive examples."
+                )
+
+            obs_key = DTM.configurations.get_by_index(i).obs_key
+            ti = t[REGISTRY_KEY_DISENTENGLEMENT_TARGETS][:, i].detach().cpu().numpy()
+            tni = tn[REGISTRY_KEY_DISENTENGLEMENT_TARGETS][:, i].detach().cpu().numpy()
+            ti_values = torch.tensor(DTM.convert_array_categorical_to_value(obs_key=obs_key, array=ti)).to(device)
+            tni_values = torch.tensor(DTM.convert_array_categorical_to_value(obs_key=obs_key, array=tni)).to(device)
+
+            if c.non_categorical_coefficient_method == "absolute_difference":
+                return torch.abs(ti_values - tni_values)
+
+            elif c.non_categorical_coefficient_method == "squared_difference":
+                return torch.square(ti_values - tni_values)
+
             else:
-                raise ValueError("Unknown `non_categorical_coefficient_method`.")
+                raise ValueError(f"`non_categorical_coefficient_method`: `{c.non_categorical_coefficient_method}`.")
+
         else:
             raise ValueError("Unknown `target_type`.")
 
     def mse_with_reparametrized_z(self, t, tp, tn, i, io, iop, ion, rli, c):
         lg = c.latent_group
         ce = c.counteractive_example
+
         if ce in [NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY]:
             return F.mse_loss(
                 input=(ion if ce == NEGATIVE_EXAMPLE_KEY else iop)["z"][:, rli[lg]],  # true
                 target=io["z"][:, rli[lg]],  # pred
                 reduction="none",
             ).mean(dim=1)
+
         elif ce == BOTH_EXAMPLE_KEY:
             raise ValueError(f"MSE does not work with {BOTH_EXAMPLE_KEY} example datapoints.")
+
         else:
             raise ValueError("Undefined counteractive example key.")
 
     def mae_with_reparametrized_z(self, t, tp, tn, i, io, iop, ion, rli, c):
         lg = c.latent_group
         ce = c.counteractive_example
+
         if ce in [NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY]:
             return F.l1_loss(
                 input=(ion if ce == NEGATIVE_EXAMPLE_KEY else iop)["z"][:, rli[lg]],  # true
                 target=io["z"][:, rli[lg]],  # pred
                 reduction="none",
             ).mean(dim=1)
+
         elif ce == BOTH_EXAMPLE_KEY:
             raise ValueError(f"MAE does not work with {BOTH_EXAMPLE_KEY} example datapoints.")
+
         else:
             raise ValueError("Undefined counteractive example key.")
 
     def cosine_similarity_with_reparametrized_z(self, t, tp, tn, i, io, iop, ion, rli, c):
         lg = c.latent_group
         ce = c.counteractive_example
+
         if ce in [NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY]:
             return F.cosine_similarity(
                 x1=(ion if ce == NEGATIVE_EXAMPLE_KEY else iop)["z"][:, rli[lg]],  # true
                 x2=io["z"][:, rli[lg]],  # pred
                 dim=1,
             )
+
         elif ce == BOTH_EXAMPLE_KEY:
             raise ValueError(f"Cosine similarity does not work with {BOTH_EXAMPLE_KEY} example datapoints.")
+
         else:
             raise ValueError("Undefined counteractive example key.")
 
@@ -272,7 +288,7 @@ class AuxillaryLossesMixin:
     # TODO: minimize mutual information
     # TODO: kl-loss
     # TODO: Bhattacharyya distance
-    # TODO: cosine similarity and cosine embedding loss
+    # TODO: cosine embedding loss
     # TODO: some other similarity based loss
     # TODO: constrastive loss: F.triplet_margin_loss, F.triplet_margin_with_distance_loss
     # TODO: define which losses satisfy triangle inequality

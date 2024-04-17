@@ -2,7 +2,7 @@
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator  # ValidationError
+from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator, validator
 
 from ._auxillarylosswarmupmanager import AuxillaryLossWarmupManager
 from ._myconstants import EXAMPLE_KEYS, LATENT_INDEX_GROUP_NAMES, LOSS_NAMING_DELIMITER, LOSS_NAMING_PREFIX
@@ -27,16 +27,17 @@ class TardisLoss(BaseModel):
     index: int | None = None
     loss_identifier_string: str | None = None
 
-    @field_validator("non_categorical_coefficient_method")
-    def non_categorical_coefficient_method_must_be_defined_for_pseudo_categorical_loss(cls, v):
-        if cls.target_type == "pseudo_categorical" and not isinstance(v, str):
+    @validator("non_categorical_coefficient_method", always=True)
+    def non_categorical_coefficient_method_must_be_defined_for_pseudo_categorical_loss(cls, v, values):
+        target_type = values.get("target_type")
+        if target_type == "pseudo_categorical" and not isinstance(v, str):
             raise ValueError(
                 "`non_categorical_coefficient_method` should be defined if `target_type` is `pseudo_categorical`."
             )
-        elif cls.target_type != "pseudo_categorical" and v is not None:
+        elif target_type != "pseudo_categorical" and v is not None:
             raise ValueError(
                 f"`non_categorical_coefficient_method` (`{v}`) should be `None` "
-                f"if `target_type` is not `pseudo_categorical` (`{cls.target_type}`) ."
+                f"if `target_type` is not `pseudo_categorical` (`{target_type}`)."
             )
         return v
 
