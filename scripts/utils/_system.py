@@ -49,9 +49,27 @@ if device.type == "cuda":
         gpu_temperature = f"{gpu.temperature} °C"
         gpu_uuid = gpu.uuid
         list_gpus.append(
-            (gpu_id, gpu_name, gpu_load, gpu_free_memory, gpu_used_memory, gpu_total_memory, gpu_temperature, gpu_uuid)
+            (
+                gpu_id,
+                gpu_name,
+                gpu_load,
+                gpu_free_memory,
+                gpu_used_memory,
+                gpu_total_memory,
+                gpu_temperature,
+                gpu_uuid,
+            )
         )
-    headers = ("id", "name", "load", "free memory", "used memory", "total memory", "temperature", "uuid")
+    headers = (
+        "id",
+        "name",
+        "load",
+        "free memory",
+        "used memory",
+        "total memory",
+        "temperature",
+        "uuid",
+    )
     for ind, gpu_ind in enumerate(list_gpus):
         print(f"GPU {ind + 1}:")
         for i, j in zip(gpu_ind, headers):

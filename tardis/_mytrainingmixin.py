@@ -46,6 +46,20 @@ class MyUnsupervisedTrainingMixin(UnsupervisedTrainingMixin):
             trainer_kwargs["logger"] = [self.wandb_logger, SimpleLogger()]
             # Keep the indice of the SimpleLogger in above list to be used in `TrainerRunner._update_history`.
             simple_logger_indice = 1
+
+            if self.wandb_logger_verbose:
+                wandb_message_initialized = (
+                    f"W&B logger initialized with the following parameters: \n"
+                    f"Entity: {self.wandb_logger.experiment.entity}\n"
+                    f"Project: {self.wandb_logger.experiment.project}\n"
+                    f"ID: {self.wandb_logger.experiment.id}\n"
+                    f"Name: {self.wandb_logger.experiment.name}\n"
+                    f"Tags: {', '.join(self.wandb_logger.experiment.tags)}\n"
+                    f"Notes: {self.wandb_logger.experiment.notes}\n"
+                    f"URL: {self.wandb_logger.experiment.url}\n"
+                    f"Directory: {self.wandb_logger.experiment.dir}\n"
+                )
+                print(wandb_message_initialized)
         else:
             # If wandb_logger is not defined, there will be already only SimpleLogger as the logger, this will create
             # `trainer.logger` instead of `trainer.loggers` which is a list object.
@@ -95,16 +109,9 @@ class MyUnsupervisedTrainingMixin(UnsupervisedTrainingMixin):
         finally:
             if hasattr(self, "wandb_logger"):
                 self.wandb_logger.experiment.finish(exit_code=exit_code, quiet=True)
-                wandb_message = (
-                    f"W&B logger finalized with the following parameters: \n"
-                    f"Exit Code: {exit_code}\n"
-                    f"Entity: {self.wandb_logger.experiment.entity}\n"
-                    f"Project: {self.wandb_logger.experiment.project}\n"
-                    f"ID: {self.wandb_logger.experiment.id}\n"
-                    f"Name: {self.wandb_logger.experiment.name}\n"
-                    f"Tags: {', '.join(self.wandb_logger.experiment.tags)}\n"
-                    f"Notes: {self.wandb_logger.experiment.notes}\n"
-                    f"URL: {self.wandb_logger.experiment.url}\n"
-                    f"Directory: {self.wandb_logger.experiment.dir}\n"
-                )
-                print(wandb_message)
+                if self.wandb_logger_verbose:
+                    wandb_message_finalized = (
+                        f"W&B logger finalized successfully: \n"
+                        f"Exit Code: {exit_code}\n"
+                    )
+                    print(wandb_message_finalized)

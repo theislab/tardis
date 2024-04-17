@@ -70,15 +70,13 @@ class WassersteinLoss(TardisLoss):
                 f"Wasserstein loss with {self.latent_distribution} latent distribution is not implemented yet."
             )
 
-    def forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
+    def _forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
         self._validate_forward_inputs(
             outputs, counteractive_outputs, relevant_latent_indices
         )
-        return self.weight * self.transformation(
-            self.loss_fn(
-                outputs,
-                counteractive_outputs,
-                relevant_latent_indices,
-                epsilon=self.epsilon,
-            )
+        return self.loss_fn(
+            outputs,
+            counteractive_outputs,
+            relevant_latent_indices,
+            epsilon=self.epsilon,
         )

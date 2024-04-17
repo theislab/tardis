@@ -20,7 +20,6 @@ from scvi.data.fields import (
 from scvi.dataloaders._ann_dataloader import AnnDataLoader
 from scvi.model._utils import _init_library_size
 from scvi.model.base import ArchesMixin, BaseModelClass, RNASeqMixin, VAEMixin
-
 from ._cachedpossiblegroupdefinitionindices import (
     CachedPossibleGroupDefinitionIndices,
 )
@@ -28,10 +27,11 @@ from ._cachedpossiblegroupdefinitionindices import (
 from ._disentenglementtargetmanager import DisentanglementTargetManager
 from ._metricsmixin import MetricsMixin
 from ._modelplotting import ModelPlotting
-from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
+from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 from ._mymodule import MyModule
 from ._mytrainingmixin import MyUnsupervisedTrainingMixin
 from ._progressbarmanager import ProgressBarManager
+from ._trainingsteplogger import TrainingEpochLogger, TrainingStepLogger
 from ._utils.wandb import check_wandb_configurations
 from ._utils.warnings import ignore_predetermined_warnings
 
@@ -106,18 +106,22 @@ class MyModel(
         size_factor_key: str | None = None,
         categorical_covariate_keys: list[str] | None = None,
         continuous_covariate_keys: list[str] | None = None,
-        disentenglement_targets_configurations: list[dict] | None = None,
+        disentanglement_targets_configurations: list[dict] | None = None,
         **kwargs,
     ):
         setup_method_args = cls._get_setup_method_args(**locals())
 
+        TrainingStepLogger.reset()
+        TrainingEpochLogger.reset()
         ProgressBarManager.reset()
+        CachedPossibleGroupDefinitionIndices.reset()
+        cls._disentanglement_manager_cls.reset()
 
-        if disentenglement_targets_configurations is None:
-            disentenglement_targets_configurations = []
+        if disentanglement_targets_configurations is None:
+            disentanglement_targets_configurations = []
 
         cls._disentanglement_manager_cls.set_disentanglements(
-            disentenglement_targets_configurations
+            disentanglement_targets_configurations
         )
         obs_keys = cls._disentanglement_manager_cls.get_ordered_disentanglement_keys()
         disentanglement_targets_setup_anndata_keys = (
@@ -138,7 +142,7 @@ class MyModel(
                 REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys
             ),
             CategoricalJointObsField(
-                REGISTRY_KEY_DISENTENGLEMENT_TARGETS,
+                REGISTRY_KEY_DISENTANGLEMENT_TARGETS,
                 disentanglement_targets_setup_anndata_keys,
             ),
         ]
@@ -151,8 +155,6 @@ class MyModel(
         )
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
-
-        CachedPossibleGroupDefinitionIndices.reset()
 
         cls._disentanglement_manager_cls.set_anndata_manager_state_registry(
             value={
@@ -170,6 +172,7 @@ class MyModel(
         wandb_configurations: dict,
         hyperparams: dict | None = None,
         check_credientials: bool = False,
+        verbose: bool = True,
     ):
         if hasattr(cls, "wandb_logger"):
             assert (
@@ -197,3 +200,4 @@ class MyModel(
             cls.wandb_logger = WandbLogger(
                 config=hyperparams, **wandb_configurations["wandblogger_kwargs"]
             )  # cls.wandb_logger.experiment.id
+            cls.wandb_logger_verbose = verbose

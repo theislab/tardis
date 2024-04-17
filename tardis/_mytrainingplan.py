@@ -8,7 +8,7 @@ from scvi.train import TrainingPlan
 from scvi.train._metrics import ElboMetric
 
 from ._progressbarmanager import ProgressBarManager
-from ._trainingsteplogger import TrainingStepLogger
+from ._trainingsteplogger import TrainingEpochLogger, TrainingStepLogger
 
 
 class MyTrainingPlan(TrainingPlan):
@@ -17,6 +17,7 @@ class MyTrainingPlan(TrainingPlan):
         TrainingStepLogger.set_step(
             key="gglobal", value=copy.deepcopy(self.global_step)
         )
+        TrainingEpochLogger.set_epoch(key="current", value=self.current_epoch)
         TrainingStepLogger.increment_step(key="forward")
         return self.module(*args, **kwargs)
 

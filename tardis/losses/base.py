@@ -21,12 +21,31 @@ TRANSFORMATIONS = {
 class TardisLoss(nn.Module, ABC):
 
     def __init__(
-        self, weight: float, method_kwargs: dict, transformation: str = "none"
+        self,
+        weight: float,
+        transformation: str = "none",
+        is_minimized: bool = True,
+        method_kwargs: Dict[str, any] = {},
     ):
         super(TardisLoss, self).__init__()
         self.weight = weight
         self.method_kwargs = method_kwargs
         self.transformation = TRANSFORMATIONS[transformation]
+        self._is_minimized = is_minimized
+
+    @property
+    def weight(self):
+        if self._is_minimized:
+            return self._weight
+        else:
+            return -self._weight
+
+    @weight.setter
+    def weight(self, value):
+        if value > 0:
+            self._weight = value
+        else:
+            raise ValueError("weight should be positive")
 
     def _validate_forward_inputs(
         self, outputs, counteractive_outputs, relevant_latent_indices
@@ -69,10 +88,19 @@ class TardisLoss(nn.Module, ABC):
             raise ValueError("relevant_latent_indices should be of type torch.int")
 
     @abstractmethod
-    def forward(
+    def _forward(
         self,
         outputs: Dict[str, torch.Tensor],
         counteractive_outputs: Dict[str, torch.Tensor],
         relevant_latent_indices: torch.Tensor,
     ):
         pass
+
+    def forward(outputs, counteractive_outputs, relevant_latent_indices):
+        self._validate_forward_inputs(
+            outputs, counteractive_outputs, relevant_latent_indices
+        )
+        loss = self.weight * self.transformation(
+            self._forward(outputs, counteractive_outputs, relevant_latent_indices)
+        )
+        return loss

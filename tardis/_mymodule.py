@@ -22,9 +22,13 @@ from torch.distributions import kl_divergence as kl
 
 from ._disentenglementtargetmanager import DisentanglementTargetManager
 from ._myconstants import (
-    LOSS_MEAN_BEFORE_WEIGHT,
+    AUXILLARY_LOSS_MEAN,
     minified_method_not_supported_message,
+    REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS,
+    POSITIVE_EXAMPLE_KEY,
+    NEGATIVE_EXAMPLE_KEY,
 )
+
 
 torch.backends.cudnn.benchmark = True
 
@@ -38,7 +42,7 @@ class MyModule(VAE):
         self.auxillary_losses_keys: list[str] | None = None
         self.include_auxillary_loss = include_auxillary_loss
 
-        # Modify `DisentenglementTargetManager` to define reserved latents in loss calculations.
+        # Modify `DisentanglementTargetManager` to define reserved latents in loss calculations.
 
         # Remove the variable got from VAE initialization due to it is inherited from BaseMinifiedModeModuleClass.
         del self._minified_data_type
@@ -163,18 +167,32 @@ class MyModule(VAE):
 
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
-        if len(DisentanglementTargetManager.disentanglements) > 0:
-            counteractive_inference_outputs = self.inference_counteractive_minibatch(
-                tensors
-            )
-            auxillary_losses = DisentanglementTargetManager.get_loss(
-                inference_outputs, counteractive_inference_outputs
-            )
-        else:
-            total_auxillary_losses = {}
+        auxillary_losses = {}
 
-        if self.auxillary_losses_keys is None and len(auxillary_losses) > 0:
-            self.auxillary_losses_keys = list(auxillary_losses.keys())
+        for disentanglement in DisentanglementTargetManager.disentanglements:
+            obs_key = disentanglement.obs_key
+            positive_inputs = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][
+                obs_key
+            ][POSITIVE_EXAMPLE_KEY]
+            negative_inputs = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][
+                obs_key
+            ][NEGATIVE_EXAMPLE_KEY]
+            inference_counteractive_positive = self.inference_counteractive_minibatch(
+                positive_inputs
+            )
+            inference_counteractive_negative = self.inference_counteractive_minibatch(
+                negative_inputs
+            )
+
+            cur_loss = disentanglement.get_total_loss(
+                tensors,
+                positive_inputs,
+                negative_inputs,
+                inference_outputs,
+                inference_counteractive_positive,
+                inference_counteractive_negative,
+            )
+            auxillary_losses.update(cur_loss)
 
         if len(auxillary_losses) > 0:
             total_auxillary_losses = torch.sum(
@@ -184,16 +202,13 @@ class MyModule(VAE):
             total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(
                 reconst_loss.device
             )
+
         report_auxillary_losses = {
             k: torch.mean(v) for k, v in auxillary_losses.items()
         }
-        report_auxillary_losses[LOSS_MEAN_BEFORE_WEIGHT] = torch.mean(
+        report_auxillary_losses[AUXILLARY_LOSS_MEAN] = torch.mean(
             total_auxillary_losses
         )
-
-        # TODO: Test below line with different options.
-        # Note that `kl_weight` is determined dynamically depending on `n_epochs_kl_warmup` parameter.
-        total_auxillary_losses = kl_weight * total_auxillary_losses
 
         if self.include_auxillary_loss:
             loss = torch.mean(reconst_loss + weighted_kl_local + total_auxillary_losses)
@@ -209,6 +224,9 @@ class MyModule(VAE):
             "kl_divergence_l": kl_divergence_l,
             "kl_divergence_z": kl_divergence_z,
         }
+
+        if self.auxillary_losses_keys is None and len(auxillary_losses) > 0:
+            self.auxillary_losses_keys = list(auxillary_losses.keys())
 
         return LossOutput(
             loss=loss,

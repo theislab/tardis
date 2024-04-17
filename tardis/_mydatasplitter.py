@@ -10,7 +10,7 @@ from torch.utils.data.dataloader import (
 
 from ._counteractiveminibatchgenerator import CounteractiveMinibatchGenerator
 from ._disentenglementtargetmanager import DisentanglementTargetManager
-from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS
+from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS
 
 
 class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
@@ -24,14 +24,17 @@ class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
         data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
 
         if len(DisentanglementTargetManager.disentanglements) > 0:
-            data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS] = dict()
+            data[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS] = dict()
             # `data` is simply the minibatch itself.
             # The aim is create alternative minibatches that has the same keys as the original one
             # These minibatches, called counteractive minibatch, will be fed through `forward` method.
             for target_obs_key_ind, target_obs_key in enumerate(
                 DisentanglementTargetManager.get_ordered_disentanglement_keys()
             ):
-                target_obs_key_tensors_indices = CounteractiveMinibatchGenerator.main(
+                data[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][
+                    target_obs_key
+                ] = dict()
+                target_obs_key_tensors_indices_dict = CounteractiveMinibatchGenerator.main(
                     target_obs_key_ind=target_obs_key_ind,
                     # Full dataset and minibatch, loaded tensors can be configured by setup_anndata.
                     minibatch_tensors=data,
@@ -44,14 +47,19 @@ class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
                     # Note that this is index of `self._dataset.indices`, not the index of real full dataset.
                     minibatch_relative_index=index,
                 )
-                target_obs_key_tensors = self._dataset_fetcher.fetch(
-                    target_obs_key_tensors_indices
-                )
-                data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][
-                    target_obs_key
-                ] = target_obs_key_tensors
+                for (
+                    selection_key,
+                    target_obs_key_tensors_indices,
+                ) in target_obs_key_tensors_indices_dict.items():
+                    target_obs_key_tensors = self._dataset_fetcher.fetch(
+                        target_obs_key_tensors_indices
+                    )
+                    data[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][target_obs_key][
+                        selection_key
+                    ] = target_obs_key_tensors
 
         if self._pin_memory:
+            # It is a recursive function, so deep dict objects should not interfere the process.
             data = torch.utils.data._utils.pin_memory.pin_memory(
                 data, self._pin_memory_device
             )
@@ -127,31 +135,23 @@ class MyDataSplitter(DataSplitter):
     def predict_dataloader(self):
         raise NotImplementedError
 
+    @staticmethod
+    def convert_sparse_to_dense(batch):
+        """Recursively converts all sparse tensors in a nested dictionary to dense tensors."""
+        for key, value in batch.items():
+            if isinstance(value, dict):
+                batch[key] = MyDataSplitter.convert_sparse_to_dense(
+                    value
+                )  # Recursive call for nested dictionaries
+            elif isinstance(value, torch.Tensor) and value.layout in (
+                torch.sparse_csr,
+                torch.sparse_csc,
+            ):
+                batch[key] = value.to_dense()  # Convert sparse tensor to dense
+        return batch
+
     def on_after_batch_transfer(self, batch, dataloader_idx):
         """Converts sparse tensors to dense if necessary."""
         if self.load_sparse_tensor:
-            for key, val in batch.items():
-                # As it is a deep dictionary.
-                if key == REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS:
-                    # `deep_key` is now `target_obs_key`
-                    for deep_key, deep_val in val.items():
-                        # `deep_deep_key` is registry keys for counteractive minibatch
-                        for deep_deep_key, deep_deep_val in deep_val.items():
-                            deep_deep_layout = (
-                                deep_deep_val.layout
-                                if isinstance(deep_deep_val, torch.Tensor)
-                                else None
-                            )
-                            if (
-                                deep_deep_layout is torch.sparse_csr
-                                or deep_deep_layout is torch.sparse_csc
-                            ):
-                                batch[key][deep_key][
-                                    deep_deep_key
-                                ] = deep_deep_val.to_dense()
-                else:
-                    layout = val.layout if isinstance(val, torch.Tensor) else None
-                    if layout is torch.sparse_csr or layout is torch.sparse_csc:
-                        batch[key] = val.to_dense()
-
+            return MyDataSplitter.convert_sparse_to_dense(batch)
         return batch

@@ -9,7 +9,7 @@ import torch
 from scvi import REGISTRY_KEYS, settings
 
 from ._disentenglementtargetmanager import DisentanglementTargetManager
-from ._myconstants import REGISTRY_KEY_DISENTENGLEMENT_TARGETS
+from ._myconstants import REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 
 
 class DatapointDefinitionsKeyGenerator:
@@ -36,25 +36,16 @@ class DatapointDefinitionsKeyGenerator:
         else:
             labels_definitions = np.zeros_like(batch_definitions)
 
-        if config.method_kwargs["within_other_groups"] and operation_mode_torch:
-            # This is called when minibatch_definitions is being created, not during indice caching.
-            group_definitions = dict_items[REGISTRY_KEY_DISENTENGLEMENT_TARGETS][
+        if operation_mode_torch:
+            group_definitions = dict_items[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][
                 :, target_obs_key_ind
             ].view(-1, 1)
-            # The if the calculated group_definitions is not changed, then the
-            # counteractive minibatch will be always within the same group.
-            # The randomization of this vector to any other category than the original one
-            # is done after `minibatch_definitions` is created.
-        elif config.method_kwargs["within_other_groups"]:
+        else:
             group_definitions = (
-                dict_items[REGISTRY_KEY_DISENTENGLEMENT_TARGETS]
+                dict_items[REGISTRY_KEY_DISENTANGLEMENT_TARGETS]
                 .iloc[:, target_obs_key_ind]
                 .values.reshape(-1, 1)
             )
-        elif operation_mode_torch:
-            group_definitions = torch.zeros_like(batch_definitions)
-        else:
-            group_definitions = np.zeros_like(batch_definitions)
 
         catcovs_definitions = []
         if REGISTRY_KEYS.CAT_COVS_KEY in dict_items:
@@ -100,7 +91,7 @@ class CachedPossibleGroupDefinitionIndices:
         dataset_tensors_keys = set(dataset_tensors.keys())
         known_keys = dict(
             must_have_keys=[
-                REGISTRY_KEY_DISENTENGLEMENT_TARGETS,
+                REGISTRY_KEY_DISENTANGLEMENT_TARGETS,
                 REGISTRY_KEYS.X_KEY,
                 REGISTRY_KEYS.BATCH_KEY,
                 REGISTRY_KEYS.LABELS_KEY,
@@ -132,12 +123,7 @@ class CachedPossibleGroupDefinitionIndices:
 
     @staticmethod
     def _initialize_verify_config(config):
-        _required_kwargs = {
-            "within_batch",
-            "within_labels",
-            "within_categorical_covs",
-            "within_other_groups",
-        }
+        _required_kwargs = {"within_batch", "within_labels", "within_categorical_covs"}
         if len(_required_kwargs - set(config.method_kwargs.keys())) > 0:
             raise ValueError(
                 "Required method kwarg is missing for possible indice caching step "

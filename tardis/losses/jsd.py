@@ -34,7 +34,7 @@ class JSDNormal(TardisLoss):
 
         # Jensen-Shannon Divergence
         jsd = 0.5 * (kl_pm + kl_qm)
-        return self.weight * self.transformation(jsd)
+        return jsd
 
 
 class JSD(TardisLoss):
@@ -50,7 +50,7 @@ class JSD(TardisLoss):
                 f"JSD with {self.latent_distribution} latent distribution is not implemented yet."
             )
 
-    def forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
+    def _forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
         self._validate_forward_inputs(
             outputs, counteractive_outputs, relevant_latent_indices
         )

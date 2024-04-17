@@ -5,13 +5,11 @@ from .base import TardisLoss
 
 class CosineSimilarity(TardisLoss):
 
-    def forward(self, outputs, counteractive_outputs, relevant_latent_indices):
+    def _forward(self, outputs, counteractive_outputs, relevant_latent_indices):
         self._validate_forward_inputs(
             outputs, counteractive_outputs, relevant_latent_indices
         )
-        return self.weight * self.transformation(
-            F.cosine_similarity(
-                x1=outputs["z"][:, relevant_latent_indices],
-                x2=counteractive_outputs["z"].clone()[:, relevant_latent_indices],
-            )
+        return F.cosine_similarity(
+            x1=outputs["z"][:, relevant_latent_indices],
+            x2=counteractive_outputs["z"].clone()[:, relevant_latent_indices],
         )

@@ -1,19 +1,36 @@
 #!/usr/bin/env python3
 
+from ._utils.preprocessing import (
+    NA_CELL_TYPE_PLACEHOLDER,
+    RANK_GENES_GROUPS_KEY,
+)  # noqa
+
 MODEL_NAME = "tardis"
-REGISTRY_KEY_DISENTENGLEMENT_TARGETS = "disentanglement_target"
-REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS = "disentanglement_target_tensors"
+REGISTRY_KEY_DISENTANGLEMENT_TARGETS = "disentanglement_target"
+REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS = "disentanglement_target_tensors"
 
 minified_method_not_supported_message = (
     f"{MODEL_NAME} model currently does not support minified data."
 )
 
-LOSS_NAMING_DELIMITER = "|"
+LOSS_NAMING_DELIMITER = "_"
 LOSS_NAMING_PREFIX = "tardis"
-LOSS_MEAN_BEFORE_WEIGHT = LOSS_NAMING_DELIMITER.join(
-    [LOSS_NAMING_PREFIX, "mean", "before_weight"]
-)
+WEIGHTED_LOSS_SUFFIX = "weighted"
+AUXILLARY_LOSS_MEAN = LOSS_NAMING_DELIMITER.join([LOSS_NAMING_PREFIX, "mean"])
 
 PROGRESS_BAR_METRICS_KEYS = {"total_loss", "kl_local"}
 PROGRESS_BAR_METRICS_MODES = {"train"}  # "validation"
-LOSS_TYPES = ["complete", "reserved", "unreserved"]
+
+LATENT_INDEX_GROUP_COMPLETE = "complete"
+LATENT_INDEX_GROUP_RESERVED = "reserved"
+LATENT_INDEX_GROUP_UNRESERVED = "unreserved"
+LATENT_INDEX_GROUP_NAMES = [
+    LATENT_INDEX_GROUP_COMPLETE,
+    LATENT_INDEX_GROUP_RESERVED,
+    LATENT_INDEX_GROUP_UNRESERVED,
+]
+
+POSITIVE_EXAMPLE_KEY = "positive"
+NEGATIVE_EXAMPLE_KEY = "negative"
+BOTH_EXAMPLE_KEY = "both"
+EXAMPLE_KEYS = [POSITIVE_EXAMPLE_KEY, NEGATIVE_EXAMPLE_KEY, BOTH_EXAMPLE_KEY]

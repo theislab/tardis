@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from typing import List
 from ._disentenglementtargetconfigurations import Disentanglement
+from ._myconstants import REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 
 
 class DisentanglementTargetManager:
@@ -12,6 +13,12 @@ class DisentanglementTargetManager:
     _obs_key_to_index: Optional[dict] = {}
     n_total_reserved_latent: int = 0
     n_latent = 0
+
+    @classmethod
+    def reset(cls):
+        cls.configurations = None
+        cls.anndata_manager_state_registry = None
+        cls._categorical_to_value = dict()
 
     @classmethod
     def set_disentanglements(cls, disentanglement_configs):
@@ -23,10 +30,16 @@ class DisentanglementTargetManager:
             disentanglement = Disentanglement(**config)
             cls.disentanglements.append(disentanglement)
             cls._obs_key_to_index[obs_key] = index
+            disentanglement.index = index
 
     @classmethod
     def set_anndata_manager_state_registry(cls, value):
         cls.anndata_manager_state_registry = value
+
+        for disentanglement in cls.disentanglements:
+            obs_key = disentanglement.obs_key
+            mappings = value[REGISTRY_KEY_DISENTANGLEMENT_TARGETS]["mappings"][obs_key]
+            disentanglement.set_mappings(mappings)
 
     @classmethod
     def get_disentanglement(cls, at) -> str:
@@ -78,11 +91,3 @@ class DisentanglementTargetManager:
             raise ValueError(
                 "Not enough latent space variables to reserve for targets."
             )
-
-    @classmethod
-    def get_loss(cls, outputs, counteractive_outputs):
-        loss = {}
-        for disentanglement in cls.disentanglements:
-            cur_loss = disentanglement.get_total_loss(outputs, counteractive_outputs)
-            loss.update(cur_loss)
-        return loss
