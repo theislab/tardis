@@ -56,6 +56,7 @@ class AuxillaryLossesMixin:
 
     def calculate_auxillary_losses(self, tensors, inference_outputs):
 
+        weighted_result = dict()
         result = dict()
         for target_obs_key_ind, target_obs_key in enumerate(
             DisentenglementTargetManager.configurations.get_ordered_obs_key()
@@ -76,7 +77,7 @@ class AuxillaryLossesMixin:
 
             config_main = DisentenglementTargetManager.configurations.get_by_index(target_obs_key_ind)
             for config_individual in config_main.auxillary_losses:
-                loss = self.calculate_auxillary_loss(
+                weighted_loss, loss = self.calculate_auxillary_loss(
                     t=tensors,
                     tp=tensors_positive,
                     tn=tensors_negative,
@@ -87,9 +88,10 @@ class AuxillaryLossesMixin:
                     c=config_individual,
                     rli=relevant_latent_indices,
                 )
+                weighted_result[config_individual.loss_identifier_string] = weighted_loss
                 result[config_individual.loss_identifier_string] = loss
 
-        return result
+        return weighted_result, result
 
     @staticmethod
     def relevant_latent_indices(target_obs_key_ind) -> Dict[str, List[int]]:
@@ -139,21 +141,24 @@ class AuxillaryLossesMixin:
 
         loss = func(t=t, tp=tp, tn=tn, i=i, io=io, iop=iop, ion=ion, rli=rli, c=c, **c.method_kwargs)
 
-        return (
+        loss = (
             FinalTransformation.get(key=c.transformation)(loss=loss)
             * c.weight
-            * AuxillaryLossWarmupManager.get(  # changes depending on epoch, scaled between [0, 1]
-                key=c.loss_identifier_string, epoch=TrainingEpochLogger.current
-            )
             * self.pseudo_categorical_coefficient_calculator(i=i, t=t, tn=tn, tp=tp, c=c)
         )
+
+        weighted_loss = loss * AuxillaryLossWarmupManager.get(  # changes depending on epoch, scaled between [0, 1]
+            key=c.loss_identifier_string, epoch=TrainingEpochLogger.current
+        )
+
+        return weighted_loss, loss.detach()  # loss just for reporting
 
     def pseudo_categorical_coefficient_calculator(self, i, t, tn, tp, c):
         if c.target_type == "categorical":
             return 1.0
 
         elif c.target_type == "pseudo_categorical":
-            if c.pseudo_categorical_coefficient_method == "substract":
+            if c.non_categorical_coefficient_method == "substract":
                 # TODO: complete the class method:
                 # get tensor column from t[REGISTRY_KEY_DISENTENGLEMENT_TARGETS][i]
                 # get tensor column for `tn` or `tp`
@@ -161,7 +166,7 @@ class AuxillaryLossesMixin:
                 # substract
                 raise NotImplementedError
             else:
-                raise ValueError("Unknown `pseudo_categorical_coefficient_method`.")
+                raise ValueError("Unknown `non_categorical_coefficient_method`.")
         else:
             raise ValueError("Unknown `target_type`.")
 

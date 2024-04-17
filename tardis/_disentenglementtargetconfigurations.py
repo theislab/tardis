@@ -20,36 +20,31 @@ class TardisLoss(BaseModel):
     latent_group: StrictStr
     counteractive_example: StrictStr
     # if type is pseudo_categorical this should be set to something
-    pseudo_categorical_coefficient_method: str | None = None
+    non_categorical_coefficient_method: str | None = None
     # Accepts any dict without specific type checking.
     method_kwargs: dict
     # This is set after the initialization based on the index of the target in the provided list.
     index: int | None = None
     loss_identifier_string: str | None = None
 
-    @field_validator("pseudo_categorical_coefficient_method", "target_type")
-    def pseudo_categorical_coefficient_method_must_be_defined_for_pseudo_categorical_loss(cls, v, u):
-        if u == "pseudo_categorical" and not isinstance(v, str):
+    @field_validator("non_categorical_coefficient_method")
+    def non_categorical_coefficient_method_must_be_defined_for_pseudo_categorical_loss(cls, v):
+        if cls.target_type == "pseudo_categorical" and not isinstance(v, str):
             raise ValueError(
-                "`pseudo_categorical_coefficient_method` should be defined if `target_type` is `pseudo_categorical`."
+                "`non_categorical_coefficient_method` should be defined if `target_type` is `pseudo_categorical`."
             )
-        elif u != "pseudo_categorical" and v is not None:
+        elif cls.target_type != "pseudo_categorical" and v is not None:
             raise ValueError(
-                "`pseudo_categorical_coefficient_method` should be `None` if `target_type` is not `pseudo_categorical`."
+                f"`non_categorical_coefficient_method` (`{v}`) should be `None` "
+                f"if `target_type` is not `pseudo_categorical` (`{cls.target_type}`) ."
             )
         return v
 
     @field_validator("warmup_epoch_range")
     def warmup_epoch_range_must_have_two_length(cls, v):
-        if (
-            v is not None
-            or not isinstance(v, list)
-            or len(v) != 2
-            or not all([isinstance(k, int) for k in v])
-            or not v[0] <= v[1]
-        ):
-            raise ValueError("`warmup_epoch_range` should be `None` or list of integers with lenght 2.")
-        return v
+        if v is None or (isinstance(v, list) and len(v) == 2 and all([isinstance(k, int) for k in v]) and v[0] <= v[1]):
+            return v
+        raise ValueError(f"`warmup_epoch_range` should be `None` or list of integers with lenght 2: {v}")
 
     @field_validator("index")
     def index_must_undefined_before_init(cls, v):

@@ -31,7 +31,7 @@ from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
 from ._mymodule import MyModule
 from ._mytrainingmixin import MyUnsupervisedTrainingMixin
 from ._progressbarmanager import ProgressBarManager
-from ._trainingsteplogger import TrainingStepLogger
+from ._trainingsteplogger import TrainingEpochLogger, TrainingStepLogger
 from ._utils.wandb import check_wandb_configurations
 from ._utils.warnings import ignore_predetermined_warnings
 
@@ -97,6 +97,7 @@ class MyModel(
         setup_method_args = cls._get_setup_method_args(**locals())
 
         TrainingStepLogger.reset()
+        TrainingEpochLogger.reset()
         AuxillaryLossWarmupManager.reset()
         ProgressBarManager.reset()
         if disentenglement_targets_configurations is None:

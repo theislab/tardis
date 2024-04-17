@@ -10,6 +10,7 @@ minified_method_not_supported_message = f"{MODEL_NAME} model currently does not 
 
 LOSS_NAMING_DELIMITER = "_"
 LOSS_NAMING_PREFIX = "tardis"
+WEIGHTED_LOSS_SUFFIX = "weighted"
 AUXILLARY_LOSS_MEAN = LOSS_NAMING_DELIMITER.join([LOSS_NAMING_PREFIX, "mean"])
 
 PROGRESS_BAR_METRICS_KEYS = {"total_loss", "kl_local"}
