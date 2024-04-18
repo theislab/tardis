@@ -16,6 +16,7 @@ from ._myconstants import (
     AUXILLARY_LOSS_MEAN,
     LOSS_NAMING_DELIMITER,
     WEIGHTED_LOSS_SUFFIX,
+    REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS,
     minified_method_not_supported_message,
 )
 
@@ -158,7 +159,16 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
         # `weighted_auxillary_losses` is also determined dynamically, depending on `warmup_epoch_range` parameter.
-        weighted_auxillary_losses, auxillary_losses = self.calculate_auxillary_losses(tensors, inference_outputs)
+        
+        if REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS in tensors:
+            # Then we are using the MyAnnDataLoader, which includes the counteractive minibatches. This happens
+            # when the model is in training phase. Have a look at the `_data_loader_cls` in Model.
+            # Removing this if-else loop causes model not loadable from drive.
+            weighted_auxillary_losses, auxillary_losses = self.calculate_auxillary_losses(tensors, inference_outputs)
+        else:
+            weighted_auxillary_losses, auxillary_losses = dict(), dict()
+        
+        
         if len(weighted_auxillary_losses) > 0:
             total_weighted_auxillary_losses = torch.sum(torch.stack(list(weighted_auxillary_losses.values())), dim=0)
             total_auxillary_losses = torch.sum(torch.stack(list(auxillary_losses.values())), dim=0)

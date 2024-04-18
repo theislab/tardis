@@ -45,6 +45,7 @@ class MyModel(
 
     _module_cls = MyModule
     # Keep the original AnndataLoader for everything else other than training.
+    # This causes to miss the counteractive minibatch generation for other things. 
     _data_loader_cls = AnnDataLoader
 
     def __init__(self, adata: AnnData, **kwargs):
