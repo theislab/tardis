@@ -37,7 +37,7 @@ dependencies:
   - hiplot
   - dill
   - memory_profiler
-  - scikit-learn==1.4.1.post1
+  - scikit-learn==1.1.3
   - scikit-sparse
   - scikit-plot
   # - scikit-learn-intelex # Should be commented out for MAC Silicon
@@ -108,6 +108,7 @@ dependencies:
   - pot
   - moscot
   - xgboost>=2.0.3
+  - cellrank>=2.0
   - bioconda::decoupler>=1.3.2 # rapids dependency
   - natsort # rapids dependency
   - umap-learn>=0.5.0 # scib dependency
@@ -127,6 +128,7 @@ dependencies:
       - scib==1.1.3
       - louvain==0.8.2
       - scikit-misc==0.1.4
+      - pertpy==0.7.0
       # types
       - types-Send2Trash
       - types-colorama
