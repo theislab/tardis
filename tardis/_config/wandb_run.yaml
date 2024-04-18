@@ -2,16 +2,15 @@
 
 wandblogger_kwargs:
   entity: inecik-academic
-  project: tardis_experimental_runs
+  project: tardis_exploration_runs
   name: null # wandb should assign a random one
   save_dir:
-    relative_to: training_repository
+    relative_to: wandb_parent_directory
     path: ""
   mode: online
   tags:
     - tardis
-    - experimental
-    - development
+    - exploration
   offline: True
   save_code: False
   resume: never
