@@ -171,86 +171,6 @@ class MetricsMixin:
 
     @torch.inference_mode()
     @unsupported_if_adata_minified
-    def get_knn_purity(
-        self, 
-        labels_key: str, 
-        adata: Optional[AnnData] = None,
-        indices: Optional[Sequence[int]] = None,
-        n_neighbors: int = 30,
-    ) -> float:
-        adata = self._validate_anndata(adata if adata is not None else self.adata_manager.adata)
-        data = self.get_latent_representation(adata=adata, indices=indices)
-        labels = adata.obs[labels_key].values.flatten()
-        return MetricsMixin.get_knn_purity_precalculated(data=data, labels=labels, n_neighbors=n_neighbors)        
-    
-    @staticmethod
-    def get_knn_purity_precalculated(
-        data: np.ndarray, 
-        labels: np.ndarray, 
-        # Number of nearest neighbors.
-        n_neighbors: int = 30 
-    ) -> float:  # between zero and one.
-        labels = sklearn.preprocessing.LabelEncoder().fit_transform(labels.ravel())
-        nbrs = sklearn.neighbors.NearestNeighbors(n_neighbors=n_neighbors + 1).fit(data)
-        indices = nbrs.kneighbors(data, return_distance=False)[:, 1:]
-        neighbors_labels = np.vectorize(lambda i: labels[i])(indices)
-        scores = ((neighbors_labels - labels.reshape(-1, 1)) == 0).mean(axis=1)
-        res = [np.mean(scores[labels == i]) for i in np.unique(labels)]
-
-        return np.mean(res)
-    
-    @torch.inference_mode()
-    @unsupported_if_adata_minified
-    def get_entropy_batch_mixing_precalculated(
-        self, 
-        labels_key: str, 
-        adata: Optional[AnnData] = None,
-        indices: Optional[Sequence[int]] = None,
-        n_neighbors: int = 50, 
-        n_pools: int = 50, 
-        n_samples_per_pool: int = 100
-    ) -> float:
-        adata = self._validate_anndata(adata if adata is not None else self.adata_manager.adata)
-        data = self.get_latent_representation(adata=adata, indices=indices)
-        labels = adata.obs[labels_key].values.flatten()
-        return MetricsMixin.get_entropy_batch_mixing_precalculated(
-            data=data, labels=labels, n_neighbors=n_neighbors, n_pools=n_pools, n_samples_per_pool=n_samples_per_pool)    
-    
-    @staticmethod
-    def get_entropy_batch_mixing_precalculated(
-        data: np.ndarray, 
-        labels: np.ndarray,
-        # Number of nearest neighbors.
-        n_neighbors: int = 50, 
-        # Number of EBM computation which will be averaged.
-        n_pools: int = 50, 
-        # Number of samples to be used in each pool of execution.
-        n_samples_per_pool: int = 100
-    ) -> float:  # between zero and one.
-
-        def __entropy_from_indices(indices, n_cat):
-            return scipy.stats.entropy(np.array(np.unique(indices, return_counts=True)[1].astype(np.int32)), base=n_cat)
-        n_cat = len(np.unique(labels))
-        # print(f'Calculating EBM with n_cat = {n_cat}')
-        neighbors = sklearn.neighbors.NearestNeighbors(n_neighbors=n_neighbors + 1).fit(data)
-        indices = neighbors.kneighbors(data, return_distance=False)[:, 1:]
-        batch_indices = np.vectorize(lambda i: labels[i])(indices)
-        entropies = np.apply_along_axis(__entropy_from_indices, axis=1, arr=batch_indices, n_cat=n_cat)
-
-        # average n_pools entropy results where each result is an average of n_samples_per_pool random samples.
-        if n_pools == 1:
-            score = np.mean(entropies)
-        else:
-            score = np.mean([
-                np.mean(entropies[np.random.choice(len(entropies), size=n_samples_per_pool)])
-                for _ in range(n_pools)
-            ])
-
-        return score
-
-
-    @torch.inference_mode()
-    @unsupported_if_adata_minified
     def get_reconstruction_r2(
         self,
         adata: Optional[AnnData] = None,
@@ -327,6 +247,86 @@ class MetricsMixin:
                 return true, pred, r2
 
         return np.mean(values)
+
+    @torch.inference_mode()
+    @unsupported_if_adata_minified
+    def get_knn_purity(
+        self, 
+        labels_key: str, 
+        adata: Optional[AnnData] = None,
+        indices: Optional[Sequence[int]] = None,
+        n_neighbors: int = 30,
+    ) -> float:
+        adata = self._validate_anndata(adata if adata is not None else self.adata_manager.adata)
+        data = self.get_latent_representation(adata=adata, indices=indices)
+        labels = adata.obs[labels_key].values.flatten()
+        return MetricsMixin.get_knn_purity_precalculated(data=data, labels=labels, n_neighbors=n_neighbors)        
+    
+    @staticmethod
+    def get_knn_purity_precalculated(
+        data: np.ndarray, 
+        labels: np.ndarray, 
+        # Number of nearest neighbors.
+        n_neighbors: int = 30 
+    ) -> float:  # between zero and one.
+        labels = sklearn.preprocessing.LabelEncoder().fit_transform(labels.ravel())
+        nbrs = sklearn.neighbors.NearestNeighbors(n_neighbors=n_neighbors + 1).fit(data)
+        indices = nbrs.kneighbors(data, return_distance=False)[:, 1:]
+        neighbors_labels = np.vectorize(lambda i: labels[i])(indices)
+        scores = ((neighbors_labels - labels.reshape(-1, 1)) == 0).mean(axis=1)
+        res = [np.mean(scores[labels == i]) for i in np.unique(labels)]
+
+        return np.mean(res)
+    
+    @torch.inference_mode()
+    @unsupported_if_adata_minified
+    def get_entropy_batch_mixing(
+        self, 
+        batch_key: str, 
+        adata: Optional[AnnData] = None,
+        indices: Optional[Sequence[int]] = None,
+        n_neighbors: int = 50, 
+        n_pools: int = 50, 
+        n_samples_per_pool: int = 100
+    ) -> float:
+        adata = self._validate_anndata(adata if adata is not None else self.adata_manager.adata)
+        data = self.get_latent_representation(adata=adata, indices=indices)
+        batch = adata.obs[batch_key].values.flatten()
+        return MetricsMixin.get_entropy_batch_mixing_precalculated(
+            data=data, batch=batch, n_neighbors=n_neighbors, n_pools=n_pools, n_samples_per_pool=n_samples_per_pool)    
+    
+    @staticmethod
+    def get_entropy_batch_mixing_precalculated(
+        data: np.ndarray, 
+        batch: np.ndarray,
+        # Number of nearest neighbors.
+        n_neighbors: int = 50, 
+        # Number of EBM computation which will be averaged.
+        n_pools: int = 50, 
+        # Number of samples to be used in each pool of execution.
+        n_samples_per_pool: int = 100
+    ) -> float:  # between zero and one.
+
+        def __entropy_from_indices(indices, n_cat):
+            return scipy.stats.entropy(np.array(np.unique(indices, return_counts=True)[1].astype(np.int32)), base=n_cat)
+        n_cat = len(np.unique(batch))
+        # print(f'Calculating EBM with n_cat = {n_cat}')
+        neighbors = sklearn.neighbors.NearestNeighbors(n_neighbors=n_neighbors + 1).fit(data)
+        indices = neighbors.kneighbors(data, return_distance=False)[:, 1:]
+        batch_indices = np.vectorize(lambda i: batch[i])(indices)
+        entropies = np.apply_along_axis(__entropy_from_indices, axis=1, arr=batch_indices, n_cat=n_cat)
+
+        # average n_pools entropy results where each result is an average of n_samples_per_pool random samples.
+        if n_pools == 1:
+            score = np.mean(entropies)
+        else:
+            score = np.mean([
+                np.mean(entropies[np.random.choice(len(entropies), size=n_samples_per_pool)])
+                for _ in range(n_pools)
+            ])
+
+        return score
+
 
     # TODO: implement distentenglement measures
     # How do you define disentenglement. Look at papers.
