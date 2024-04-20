@@ -19,7 +19,7 @@ TRANSFORMATIONS = {
 
 
 class CoefficientFunction:
-    def __call__(self, x, other):
+    def __call__(self, x: Dict[str, torch.Tensor], other: Dict[str, torch.Tensor]):
         pass
 
 
@@ -36,18 +36,17 @@ class TardisLoss(nn.Module, ABC):
     def __init__(
         self,
         weight: float,
-        transformation: str = "none",
         is_minimized: bool = True,
-        method_kwargs: Dict[str, any] = {},
-        target_type: str = "categorical",
+        transformation: str = "none",
         coefficient: str = "none",
-    ):
+        target_type: str = "categorical",
+        method_kwargs: Dict[str, any] = {},
+    ) -> None:
+
         super(TardisLoss, self).__init__()
-        self.weight = weight
-        self.method_kwargs = method_kwargs
+        self._weight = weight
         self.transformation = TRANSFORMATIONS[transformation]
         self._is_minimized = is_minimized
-        self.target_type = target_type
 
         if isinstance(coefficient, float):
             self.coefficient_fn = lambda x, other: coefficient * torch.ones(
@@ -59,6 +58,9 @@ class TardisLoss(nn.Module, ABC):
             self.coefficient_fn = COEFFICIENT_FUNCTIONS[coefficient]
         else:
             self.coefficient_fn = coefficient
+
+        self.target_type = target_type
+        self.method_kwargs = method_kwargs
 
     def get_coefficients(self, x, other):
         return self.coefficient_fn(x, other)
@@ -75,15 +77,18 @@ class TardisLoss(nn.Module, ABC):
             return -self._weight
 
     @weight.setter
-    def weight(self, value):
+    def weight(self, value: float):
         if value > 0:
             self._weight = value
         else:
             raise ValueError("weight should be positive")
 
     def _validate_forward_inputs(
-        self, outputs, counteractive_outputs, relevant_latent_indices
-    ):
+        self,
+        outputs: Dict[str, torch.Tensor],
+        counteractive_outputs: Dict[str, torch.Tensor],
+        relevant_latent_indices: torch.Tensor,
+    ) -> torch.Tensor:
         if not (
             isinstance(outputs, dict)
             and "z" in outputs.keys()
@@ -127,10 +132,15 @@ class TardisLoss(nn.Module, ABC):
         outputs: Dict[str, torch.Tensor],
         counteractive_outputs: Dict[str, torch.Tensor],
         relevant_latent_indices: torch.Tensor,
-    ):
+    ) -> torch.Tensor:
         pass
 
-    def forward(self, outputs, counteractive_outputs, relevant_latent_indices):
+    def forward(
+        self,
+        outputs: Dict[str, torch.Tensor],
+        counteractive_outputs: Dict[str, torch.Tensor],
+        relevant_latent_indices: torch.Tensor,
+    ) -> torch.Tensor:
         self._validate_forward_inputs(
             outputs, counteractive_outputs, relevant_latent_indices
         )

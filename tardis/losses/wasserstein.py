@@ -1,12 +1,15 @@
 import torch
-from typing import Any
+from typing import Dict, Optional
 
 from .base import TardisLoss
 
 
 def _wasserstein_loss_with_normal_latent_distribution(
-    outputs, counteractive_outputs, relevant_latent_indices, epsilon=1e-8
-) -> Any:
+    outputs: Dict[str, torch.Tensor],
+    counteractive_outputs: Dict[str, torch.Tensor],
+    relevant_latent_indices: torch.Tensor,
+    epsilon: Optional[float] = 1e-8,
+) -> torch.Tensor:
     # The Wasserstein distance between two normal distributions is given by the following formula:
     # W_{2,i}^2 = (\mu_{1,i} - \mu_{2,i})^2 + (\sigma_{1,i}^2 + \sigma_{2,i}^2 - 2 \sigma_{1,i} \sigma_{2,i})
 
@@ -43,9 +46,22 @@ def _wasserstein_loss_with_normal_latent_distribution(
 
 class WassersteinLoss(TardisLoss):
     def __init__(
-        self, weight: float, method_kwargs: dict, transformation: str = "none"
-    ):
-        super().__init__(weight, method_kwargs, transformation)
+        self,
+        weight: float,
+        is_minimized: bool = True,
+        transformation: str = "none",
+        coefficient: str = "none",
+        target_type: str = "categorical",
+        method_kwargs: Dict[str, any] = {},
+    ) -> None:
+        super(WassersteinLoss, self).__init__(
+            weight=weight,
+            is_minimized=is_minimized,
+            transformation=transformation,
+            coefficient=coefficient,
+            target_type=target_type,
+            method_kwargs=method_kwargs,
+        )
 
         latent_distribution = method_kwargs.get("latent_distribution", "normal")
 
@@ -56,10 +72,7 @@ class WassersteinLoss(TardisLoss):
                 f"Wasserstein loss with {self.latent_distribution} latent distribution is not implemented yet."
             )
 
-        if "epsilon" in method_kwargs:
-            self.epsilon = method_kwargs["epsilon"]
-        else:
-            self.epsilon = 1e-8
+        self.epsilon = method_kwargs.get("epsilon", 1e-8)
 
     @property
     def loss_fn(self):
@@ -70,10 +83,13 @@ class WassersteinLoss(TardisLoss):
                 f"Wasserstein loss with {self.latent_distribution} latent distribution is not implemented yet."
             )
 
-    def _forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
-        self._validate_forward_inputs(
-            outputs, counteractive_outputs, relevant_latent_indices
-        )
+    def _forward(
+        self,
+        outputs: Dict[str, torch.Tensor],
+        counteractive_outputs: Dict[str, torch.Tensor],
+        relevant_latent_indices: torch.Tensor,
+    ) -> torch.Tensor:
+
         return self.loss_fn(
             outputs,
             counteractive_outputs,

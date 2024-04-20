@@ -1,13 +1,19 @@
 import torch
-from typing import Any
 from torch.distributions import Normal
 from torch.distributions.kl import kl_divergence
+from typing import Dict
+
 from .base import TardisLoss
 
 
 class JSDNormal(TardisLoss):
 
-    def forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
+    def _forward(
+        self,
+        outputs: Dict[str, torch.Tensor],
+        counteractive_outputs: Dict[str, torch.Tensor],
+        relevant_latent_indices: torch.Tensor,
+    ) -> torch.Tensor:
         self._validate_forward_inputs(
             outputs, counteractive_outputs, relevant_latent_indices
         )
@@ -38,22 +44,46 @@ class JSDNormal(TardisLoss):
 
 
 class JSD(TardisLoss):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.latent_distribution = kwargs.get("latent_distribution", "normal")
+    def __init__(
+        self,
+        weight: float,
+        is_minimized: bool = True,
+        transformation: str = "none",
+        coefficient: str = "none",
+        target_type: str = "categorical",
+        method_kwargs: Dict[str, any] = {},
+    ) -> None:
+        super(JSD, self).__init__(
+            weight=weight,
+            is_minimized=is_minimized,
+            transformation=transformation,
+            coefficient=coefficient,
+            target_type=target_type,
+            method_kwargs=method_kwargs,
+        )
+        self.latent_distribution = method_kwargs.get("latent_distribution", "normal")
 
         if self.latent_distribution == "normal":
-            self._jsd = JSDNormal(*args, **kwargs)
+            self._jsd = JSDNormal(
+                weight=weight,
+                is_minimized=is_minimized,
+                transformation=transformation,
+                coefficient=coefficient,
+                target_type=target_type,
+                method_kwargs=method_kwargs,
+            )
         else:
             raise NotImplementedError(
                 f"JSD with {self.latent_distribution} latent distribution is not implemented yet."
             )
 
-    def _forward(self, outputs, counteractive_outputs, relevant_latent_indices) -> Any:
-        self._validate_forward_inputs(
-            outputs, counteractive_outputs, relevant_latent_indices
-        )
-        return self._jsd.forward(
+    def _forward(
+        self,
+        outputs: Dict[str, torch.Tensor],
+        counteractive_outputs: Dict[str, torch.Tensor],
+        relevant_latent_indices: torch.Tensor,
+    ) -> torch.Tensor:
+
+        return self._jsd._forward(
             outputs, counteractive_outputs, relevant_latent_indices
         )
