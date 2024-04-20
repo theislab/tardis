@@ -151,3 +151,8 @@ scripts/sync_drive_aleyna.sh
 
 # Ignore all files in the .vscode directory
 ./vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
