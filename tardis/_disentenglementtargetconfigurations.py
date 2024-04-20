@@ -11,8 +11,6 @@ from pydantic import (
 )
 
 from ._losses import Losses, Triplets
-from scvi import REGISTRY_KEYS
-from ._myconstants import REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 
 
 def isnumeric(s):
@@ -38,19 +36,6 @@ class Indices:
     complete: torch.Tensor = torch.tensor([], dtype=torch.int)
 
 
-class CoefficientFunction:
-    def __call__(self, x, other):
-        pass
-
-
-COEFFICIENT_FUNCTIONS = {
-    "none": lambda x, other: torch.ones(x.shape[0]).device(x.device),
-    "abs": lambda x, other: torch.abs(x - other),
-    "square": lambda x, other: torch.square(x - other),
-    "categorical": lambda x, other: torch.ones(x.shape[0]).device(x.device),
-}
-
-
 class Disentanglement:
 
     def __init__(
@@ -60,12 +45,8 @@ class Disentanglement:
         counteractive_minibatch_settings: CounteractiveMinibatchSettings,
         losses: Union[List[dict], dict] = [],
         triplets: Union[List[dict], dict] = [],
-        positive_coefficient: Union[float, CoefficientFunction] = 1.0,
-        negative_coefficient: Union[float, CoefficientFunction] = 1.0,
-        target_type: str = "categorical",
     ):
         self.obs_key = obs_key
-        self.target_type = target_type
         self.n_reserved_latent = n_reserved_latent
 
         self.counteractive_minibatch_settings = CounteractiveMinibatchSettings(
@@ -84,40 +65,6 @@ class Disentanglement:
             self._triplets.append(Triplets(triplet, obs_key))
 
         self._indices = Indices()
-
-        if isinstance(positive_coefficient, float):
-            self._positive_coefficient = (
-                lambda x, other: positive_coefficient
-                * torch.ones(x.shape[0], device=x.device)
-            )
-        elif isinstance(positive_coefficient, str):
-            if positive_coefficient not in COEFFICIENT_FUNCTIONS:
-                raise ValueError(
-                    f"Unknown coefficient function: {positive_coefficient}"
-                )
-            self._positive_coefficient = COEFFICIENT_FUNCTIONS[positive_coefficient]
-        else:
-            self._positive_coefficient = positive_coefficient
-
-        if isinstance(negative_coefficient, float):
-            self._negative_coefficient = (
-                lambda x, other: negative_coefficient
-                * torch.ones(x.shape[0], device=x.device)
-            )
-        elif isinstance(negative_coefficient, str):
-            if negative_coefficient not in COEFFICIENT_FUNCTIONS:
-                raise ValueError(
-                    f"Unknown coefficient function: {negative_coefficient}"
-                )
-            self._negative_coefficient = COEFFICIENT_FUNCTIONS[negative_coefficient]
-        else:
-            self._negative_coefficient = negative_coefficient
-
-        if self.target_type == "pseudo_categorical":
-            self._positive_coefficient = lambda x, other: torch.ones(x.shape[0]).device(
-                x.device
-            )
-
         self._category_to_values = []
         self.index = None
 
@@ -163,45 +110,14 @@ class Disentanglement:
         counteractive_negative_outputs,
     ):
 
-        device = inputs[REGISTRY_KEYS.X_KEY].device
-
-        if self.target_type == "pseudo_categorical":
-
-            _inputs = (
-                inputs[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, self.index]
-                .detach()
-                .cpu()
-                .numpy()
-            )
-            _positive_inputs = None
-            _negative_inputs = (
-                negative_inputs[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, self.index]
-                .detach()
-                .cpu()
-                .numpy()
-            )
-
-            _inputs = torch.tensor(
-                self.convert_array_categorical_to_value(_inputs), device=device
-            )
-            _negative_inputs = torch.tensor(
-                self.convert_array_categorical_to_value(_negative_inputs), device=device
-            )
-        else:
-            _inputs = inputs[REGISTRY_KEYS.X_KEY]
-            _positive_inputs = positive_inputs[REGISTRY_KEYS.X_KEY]
-            _negative_inputs = negative_inputs[REGISTRY_KEYS.X_KEY]
-
-        positive_coefficient = self._positive_coefficient(_inputs, _positive_inputs)
-        negative_coefficient = self._negative_coefficient(_inputs, _negative_inputs)
-
         total_loss = self._losses.get_total_loss(
+            inputs,
+            positive_inputs,
+            negative_inputs,
             outputs,
             counteractive_positive_outputs,
             counteractive_negative_outputs,
             self._indices,
-            positive_coefficient,
-            negative_coefficient,
         )
         for triplet_losses in self._triplets:
             triplet_loss = triplet_losses.get_total_loss(
@@ -209,8 +125,6 @@ class Disentanglement:
                 counteractive_positive_outputs,
                 counteractive_negative_outputs,
                 self._indices,
-                positive_coefficient,
-                negative_coefficient,
             )
             total_loss.update(triplet_loss)
         return total_loss

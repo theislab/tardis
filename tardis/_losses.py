@@ -7,6 +7,8 @@ from ._myconstants import LOSS_NAMING_PREFIX
 from ._myconstants import LATENT_INDEX_GROUP_NAMES
 from ._progressbarmanager import ProgressBarManager
 from ._trainingsteplogger import TrainingEpochLogger
+from scvi import REGISTRY_KEYS
+from ._myconstants import REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 
 
 class LossesBase:
@@ -107,13 +109,48 @@ class LossesBase:
         else:
             return (epoch - start) / (end + 1 - start)
 
+    def get_inputs(self, inputs, positive_inputs, negative_inputs, target_type):
+
+        device = inputs[REGISTRY_KEYS.X_KEY].device
+
+        if target_type == "pseudo_categorical":
+
+            _inputs = (
+                inputs[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, self.index]
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            _positive_inputs = None
+            _negative_inputs = (
+                negative_inputs[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, self.index]
+                .detach()
+                .cpu()
+                .numpy()
+            )
+
+            _inputs = torch.tensor(
+                self.convert_array_categorical_to_value(_inputs), device=device
+            )
+            _negative_inputs = torch.tensor(
+                self.convert_array_categorical_to_value(_negative_inputs), device=device
+            )
+        else:
+            _inputs = inputs[REGISTRY_KEYS.X_KEY]
+            _positive_inputs = positive_inputs[REGISTRY_KEYS.X_KEY]
+            _negative_inputs = negative_inputs[REGISTRY_KEYS.X_KEY]
+
+        return _inputs, _positive_inputs, _negative_inputs
+
     def get_total_loss(
         self,
+        inputs,
+        positive_inputs,
+        negative_inputs,
         outputs,
         counteractive_positive_outputs,
         counteractive_negative_outputs,
         indices,
-        *coefficients,
     ):
         total_loss = [{}, {}]
 
@@ -131,17 +168,21 @@ class LossesBase:
                         type(loss_fn).__name__.lower(),
                     ]
                 )
+
+                _inputs, _positive_inputs, _negative_inputs = self.get_inputs(
+                    inputs, positive_inputs, negative_inputs, loss_fn.target_type
+                )
                 if loss_fn is loss_fn.is_minimized:
                     counteractive_outputs = counteractive_positive_outputs
+                    coefficients = loss_fn.get_coefficients(_inputs, _positive_inputs)
                 else:
                     counteractive_outputs = counteractive_negative_outputs
+                    coefficients = loss_fn.get_coefficients(_inputs, _negative_inputs)
 
                 index = int(loss_fn.is_minimized)
                 warmup_weight = self.get_warmup_weight(warmup_period)
                 loss = loss_fn.forward(outputs, counteractive_outputs, relavant_indices)
-                total_loss[index][identifier] = (
-                    warmup_weight * coefficients[index] * loss
-                )
+                total_loss[index][identifier] = coefficients * warmup_weight * loss
 
         return total_loss
 
@@ -150,18 +191,22 @@ class Losses(LossesBase):
 
     def get_total_loss(
         self,
+        inputs,
+        positive_inputs,
+        negative_inputs,
         outputs,
         counteractive_positive_outputs,
         counteractive_negative_outputs,
         indices,
-        *coefficients,
     ):
         positive_losses, negative_losses = super().get_total_loss(
+            inputs,
+            positive_inputs,
+            negative_inputs,
             outputs,
             counteractive_positive_outputs,
             counteractive_negative_outputs,
             indices,
-            coefficients,
         )
         positive_losses.update(negative_losses)
         return positive_losses
@@ -171,18 +216,22 @@ class Triplets(LossesBase):
 
     def get_total_loss(
         self,
+        inputs,
+        positive_inputs,
+        negative_inputs,
         outputs,
         counteractive_positive_outputs,
         counteractive_negative_outputs,
         indices,
-        *coefficients,
     ):
         positive_losses, negative_losses = super().get_total_loss(
+            inputs,
+            positive_inputs,
+            negative_inputs,
             outputs,
             counteractive_positive_outputs,
             counteractive_negative_outputs,
             indices,
-            coefficients,
         )
 
         positive = torch.mean(torch.cat([v for v in positive_losses.values()]))

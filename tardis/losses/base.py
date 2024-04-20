@@ -18,6 +18,19 @@ TRANSFORMATIONS = {
 }
 
 
+class CoefficientFunction:
+    def __call__(self, x, other):
+        pass
+
+
+COEFFICIENT_FUNCTIONS = {
+    "none": lambda x, other: torch.ones(x.shape[0]).to(device=x.device),
+    "abs": lambda x, other: torch.abs(x - other),
+    "square": lambda x, other: torch.square(x - other),
+    "categorical": lambda x, other: torch.ones(x.shape[0]).to(device=x.device),
+}
+
+
 class TardisLoss(nn.Module, ABC):
 
     def __init__(
@@ -26,12 +39,33 @@ class TardisLoss(nn.Module, ABC):
         transformation: str = "none",
         is_minimized: bool = True,
         method_kwargs: Dict[str, any] = {},
+        target_type: str = "categorical",
+        coefficient: str = "none",
     ):
         super(TardisLoss, self).__init__()
         self.weight = weight
         self.method_kwargs = method_kwargs
         self.transformation = TRANSFORMATIONS[transformation]
         self._is_minimized = is_minimized
+        self.target_type = target_type
+
+        if isinstance(coefficient, float):
+            self.coefficient_fn = lambda x, other: coefficient * torch.ones(
+                x.shape[0], device=x.device
+            )
+        elif isinstance(coefficient, str):
+            if coefficient not in COEFFICIENT_FUNCTIONS:
+                raise ValueError(f"Unknown coefficient function: {coefficient}")
+            self.coefficient_fn = COEFFICIENT_FUNCTIONS[coefficient]
+        else:
+            self.coefficient_fn = coefficient
+
+    def get_coefficients(self, x, other):
+        return self.coefficient_fn(x, other)
+
+    @property
+    def is_minimized(self):
+        return self._is_minimized
 
     @property
     def weight(self):
@@ -96,7 +130,7 @@ class TardisLoss(nn.Module, ABC):
     ):
         pass
 
-    def forward(outputs, counteractive_outputs, relevant_latent_indices):
+    def forward(self, outputs, counteractive_outputs, relevant_latent_indices):
         self._validate_forward_inputs(
             outputs, counteractive_outputs, relevant_latent_indices
         )
