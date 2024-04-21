@@ -1,5 +1,7 @@
-from collections import defaultdict
 import torch
+import numpy as np
+from collections import defaultdict
+
 
 from .losses import LOSSES
 from ._myconstants import LOSS_NAMING_DELIMITER
@@ -9,6 +11,14 @@ from ._progressbarmanager import ProgressBarManager
 from ._trainingsteplogger import TrainingEpochLogger
 from scvi import REGISTRY_KEYS
 from ._myconstants import REGISTRY_KEY_DISENTANGLEMENT_TARGETS
+
+
+def isnumeric(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 
 class LossesBase:
@@ -29,11 +39,11 @@ class LossesBase:
                 method_kwargs=loss_config["method_kwargs"],
             )
 
-            loss_type = loss_config["loss_type"]
+            latent_group = loss_config["latent_group"]
 
-            if loss_type == "reserved":
+            if latent_group == "reserved":
                 self.reserved.append(loss_obj)
-            elif loss_type == "unreserved":
+            elif latent_group == "unreserved":
                 self.unreserved.append(loss_obj)
             else:
                 self.complete.append(loss_obj)
@@ -42,7 +52,7 @@ class LossesBase:
                 [
                     LOSS_NAMING_PREFIX,
                     obs_key,
-                    loss_type,
+                    latent_group,
                     loss_cls.__name__.lower(),
                 ]
             )
@@ -52,7 +62,7 @@ class LossesBase:
             if loss_config["progress_bar"]:
                 ProgressBarManager.add(identifier)
 
-            self._warmup_periods[loss_type].append(loss_config["warmup_period"])
+            self._warmup_periods[latent_group].append(loss_config["warmup_period"])
 
     def _validate_loss_config(self, loss_config):
 
@@ -64,7 +74,7 @@ class LossesBase:
         transformation = loss_config.get("transformation", "identity")
         progress_bar = loss_config.get("progress_bar", False)
         method_kwargs = loss_config.get("method_kwargs", {})
-        loss_type = loss_config.get("type", "complete")
+        latent_group = loss_config.get("latent_group", "complete")
         is_minimized = loss_config.get("is_minimized", True)
         warmup_period = loss_config.get("warmup_period", [0, 0])
 
@@ -81,9 +91,9 @@ class LossesBase:
             raise ValueError("loss_config['progress_bar'] should be a boolean.")
         if not isinstance(method_kwargs, dict):
             raise ValueError("loss_config['method_kwargs'] should be a dictionary.")
-        if not isinstance(loss_type, str):
+        if not isinstance(latent_group, str):
             raise ValueError("loss_config['type'] should be a string.")
-        if loss_type not in set(LATENT_INDEX_GROUP_NAMES):
+        if latent_group not in set(LATENT_INDEX_GROUP_NAMES):
             raise ValueError(
                 f"loss_config['type'] should be one of {LATENT_INDEX_GROUP_NAMES}"
             )
@@ -94,7 +104,7 @@ class LossesBase:
             transformation=transformation,
             progress_bar=progress_bar,
             method_kwargs=method_kwargs,
-            loss_type=loss_type,
+            latent_group=latent_group,
             is_minimized=is_minimized,
             warmup_period=warmup_period,
         )
@@ -109,7 +119,9 @@ class LossesBase:
         else:
             return (epoch - start) / (end + 1 - start)
 
-    def get_inputs(self, inputs, positive_inputs, negative_inputs, target_type):
+    def get_inputs(
+        self, inputs, positive_inputs, negative_inputs, target_type, pseudo_categories
+    ):
 
         device = inputs[REGISTRY_KEYS.X_KEY].device
 
@@ -129,11 +141,9 @@ class LossesBase:
                 .numpy()
             )
 
-            _inputs = torch.tensor(
-                self.convert_array_categorical_to_value(_inputs), device=device
-            )
+            _inputs = torch.tensor(pseudo_categories(_inputs), device=device)
             _negative_inputs = torch.tensor(
-                self.convert_array_categorical_to_value(_negative_inputs), device=device
+                pseudo_categories(_negative_inputs), device=device
             )
         else:
             _inputs = inputs[REGISTRY_KEYS.X_KEY]
@@ -151,7 +161,9 @@ class LossesBase:
         counteractive_positive_outputs,
         counteractive_negative_outputs,
         indices,
+        pseudo_categories,
     ):
+        weighted_total_loss = [{}, {}]
         total_loss = [{}, {}]
 
         for loss_type in LATENT_INDEX_GROUP_NAMES:
@@ -170,7 +182,11 @@ class LossesBase:
                 )
 
                 _inputs, _positive_inputs, _negative_inputs = self.get_inputs(
-                    inputs, positive_inputs, negative_inputs, loss_fn.target_type
+                    inputs,
+                    positive_inputs,
+                    negative_inputs,
+                    loss_fn.target_type,
+                    pseudo_categories,
                 )
                 if loss_fn is loss_fn.is_minimized:
                     counteractive_outputs = counteractive_positive_outputs
@@ -182,9 +198,11 @@ class LossesBase:
                 index = int(loss_fn.is_minimized)
                 warmup_weight = self.get_warmup_weight(warmup_period)
                 loss = loss_fn.forward(outputs, counteractive_outputs, relavant_indices)
-                total_loss[index][identifier] = coefficients * warmup_weight * loss
-
-        return total_loss
+                total_loss[index][identifier] = coefficients * loss
+                weighted_total_loss[index][identifier] = (
+                    total_loss[index][identifier] * warmup_weight
+                )
+        return weighted_total_loss, total_loss
 
 
 class Losses(LossesBase):
@@ -198,8 +216,12 @@ class Losses(LossesBase):
         counteractive_positive_outputs,
         counteractive_negative_outputs,
         indices,
+        pseudo_categories,
     ):
-        positive_losses, negative_losses = super().get_total_loss(
+        (weighted_positive_losses, weighted_negative_losses), (
+            positive_losses,
+            negative_losses,
+        ) = super().get_total_loss(
             inputs,
             positive_inputs,
             negative_inputs,
@@ -207,9 +229,12 @@ class Losses(LossesBase):
             counteractive_positive_outputs,
             counteractive_negative_outputs,
             indices,
+            pseudo_categories,
         )
         positive_losses.update(negative_losses)
-        return positive_losses
+        weighted_positive_losses.update(weighted_negative_losses)
+
+        return weighted_positive_losses, positive_losses
 
 
 class Triplets(LossesBase):
@@ -223,8 +248,12 @@ class Triplets(LossesBase):
         counteractive_positive_outputs,
         counteractive_negative_outputs,
         indices,
+        pseudo_categories,
     ):
-        positive_losses, negative_losses = super().get_total_loss(
+        (weighted_positive_losses, weighted_negative_losses), (
+            positive_losses,
+            negative_losses,
+        ) = super().get_total_loss(
             inputs,
             positive_inputs,
             negative_inputs,
@@ -232,15 +261,29 @@ class Triplets(LossesBase):
             counteractive_positive_outputs,
             counteractive_negative_outputs,
             indices,
+            pseudo_categories,
         )
 
         positive = torch.mean(torch.cat([v for v in positive_losses.values()]))
         negative = torch.mean(torch.cat([v for v in negative_losses.values()]))
+
+        weighted_positive = torch.mean(
+            torch.cat([v for v in weighted_positive_losses.values()])
+        )
+        weighted_negative = torch.mean(
+            torch.cat([v for v in weighted_negative_losses.values()])
+        )
+
         loss = torch.max(positive - negative, torch.zeros_like(positive))
+        weighted_loss = torch.max(
+            weighted_positive - weighted_negative, torch.zeros_like(weighted_positive)
+        )
+
         concatenated_keys = [
             k.split(LOSS_NAMING_DELIMITER)[-1]
             for k in set(positive_losses.keys()).union(negative_losses.keys())
         ].join(LOSS_NAMING_DELIMITER)
+
         identifier = LOSS_NAMING_DELIMITER.join(
             [
                 LOSS_NAMING_PREFIX,
@@ -249,4 +292,5 @@ class Triplets(LossesBase):
                 *concatenated_keys,
             ]
         )
-        return {identifier: loss}
+
+        return {identifier: weighted_loss}, {identifier: loss}

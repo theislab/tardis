@@ -95,10 +95,7 @@ class Disentanglement:
     def set_mappings(self, mappings):
         is_numeric = all([isnumeric(mapping) for mapping in mappings])
         _category_to_values = [float(j) if is_numeric else j for j in mappings]
-        self._category_to_values = np.vectorize(lambda x: _category_to_values[x])
-
-    def convert_array_categorical_to_value(self, array):
-        return self._category_to_values(array)
+        self._pseudo_categories = np.vectorize(lambda x: _category_to_values[x])
 
     def get_total_loss(
         self,
@@ -110,7 +107,7 @@ class Disentanglement:
         counteractive_negative_outputs,
     ):
 
-        total_loss = self._losses.get_total_loss(
+        weighted_loss, total_loss = self._losses.get_total_loss(
             inputs,
             positive_inputs,
             negative_inputs,
@@ -118,13 +115,17 @@ class Disentanglement:
             counteractive_positive_outputs,
             counteractive_negative_outputs,
             self._indices,
+            self._pseudo_categories,
         )
         for triplet_losses in self._triplets:
-            triplet_loss = triplet_losses.get_total_loss(
+            cur_weighted_loss, cur_loss = triplet_losses.get_total_loss(
                 outputs,
                 counteractive_positive_outputs,
                 counteractive_negative_outputs,
                 self._indices,
+                self._pseudo_categories,
             )
-            total_loss.update(triplet_loss)
-        return total_loss
+            total_loss.update(cur_loss)
+            weighted_loss.update(cur_weighted_loss)
+
+        return weighted_loss, total_loss

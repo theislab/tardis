@@ -27,6 +27,8 @@ from ._myconstants import (
     REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS,
     POSITIVE_EXAMPLE_KEY,
     NEGATIVE_EXAMPLE_KEY,
+    LOSS_NAMING_DELIMITER,
+    WEIGHTED_LOSS_SUFFIX,
 )
 
 
@@ -168,6 +170,7 @@ class MyModule(VAE):
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
         auxillary_losses = {}
+        weighted_auxillary_losses = {}
 
         for disentanglement in DisentanglementTargetManager.disentanglements:
             obs_key = disentanglement.obs_key
@@ -184,7 +187,7 @@ class MyModule(VAE):
                 negative_inputs
             )
 
-            cur_loss = disentanglement.get_total_loss(
+            cur_weighted_loss, cur_loss = disentanglement.get_total_loss(
                 tensors,
                 positive_inputs,
                 negative_inputs,
@@ -192,13 +195,21 @@ class MyModule(VAE):
                 inference_counteractive_positive,
                 inference_counteractive_negative,
             )
+
+            weighted_auxillary_losses.update(cur_weighted_loss)
             auxillary_losses.update(cur_loss)
 
         if len(auxillary_losses) > 0:
+            total_weighted_auxillary_losses = torch.sum(
+                torch.stack(list(auxillary_losses.values())), dim=0
+            )
             total_auxillary_losses = torch.sum(
                 torch.stack(list(auxillary_losses.values())), dim=0
             )
         else:
+            weighted_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(
+                reconst_loss.device
+            )
             total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(
                 reconst_loss.device
             )
@@ -210,8 +221,28 @@ class MyModule(VAE):
             total_auxillary_losses
         )
 
+        # Also report weighted losses. Note that this is not used in progress bar etc, as like `kl_local`.
+        report_auxillary_losses.update(
+            {
+                LOSS_NAMING_DELIMITER.join([i, WEIGHTED_LOSS_SUFFIX]): torch.mean(
+                    weighted_auxillary_losses[i]
+                )
+                for i in weighted_auxillary_losses
+            }
+        )
+
+        report_auxillary_losses[
+            LOSS_NAMING_DELIMITER.join([AUXILLARY_LOSS_MEAN, WEIGHTED_LOSS_SUFFIX])
+        ] = torch.mean(total_weighted_auxillary_losses)
+        # Also report kl after weighting
+        report_auxillary_losses[
+            LOSS_NAMING_DELIMITER.join(["kl_local", WEIGHTED_LOSS_SUFFIX])
+        ] = torch.mean(weighted_kl_local)
+
         if self.include_auxillary_loss:
-            loss = torch.mean(reconst_loss + weighted_kl_local + total_auxillary_losses)
+            loss = torch.mean(
+                reconst_loss + weighted_kl_local + total_weighted_auxillary_losses
+            )
         else:
             warnings.warn(
                 message="Auxillary loss is not added to the total loss. (include_auxillary_loss=False)",

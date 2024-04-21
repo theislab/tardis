@@ -27,7 +27,6 @@ COEFFICIENT_FUNCTIONS = {
     "none": lambda x, other: torch.ones(x.shape[0]).to(device=x.device),
     "abs": lambda x, other: torch.abs(x - other),
     "square": lambda x, other: torch.square(x - other),
-    "categorical": lambda x, other: torch.ones(x.shape[0]).to(device=x.device),
 }
 
 
@@ -59,6 +58,11 @@ class TardisLoss(nn.Module, ABC):
         else:
             self.coefficient_fn = coefficient
 
+        if self.is_minimized and target_type == "pseudo_categorical":
+            raise ValueError(
+                "The pseudo-categorical coefficient calculation will get two same vector if counteractive "
+                "example is not negative. This coefficients makes sense only for negative counteractive examples."
+            )
         self.target_type = target_type
         self.method_kwargs = method_kwargs
 
