@@ -69,9 +69,15 @@ def select_hvgs(adata_var, top_gene_number, min_mean, max_mean):
             ignore_index=False,
         )
     else:
-        warnings.warn("`highly_variable_nbatches` is not found. Only `dispersions_norm` will be used.")
+        warnings.warn(
+            "`highly_variable_nbatches` is not found. Only `dispersions_norm` will be used."
+        )
         adata_var.sort_values(
-            ["dispersions_norm"], ascending=False, na_position="last", inplace=True, ignore_index=False
+            ["dispersions_norm"],
+            ascending=False,
+            na_position="last",
+            inplace=True,
+            ignore_index=False,
         )
 
     if top_gene_number is None:
@@ -97,7 +103,11 @@ def calculate_de_genes(adata, na_cell_type_placeholder=None):
     if na_cell_type_placeholder is None:
         na_cell_type_placeholder = NA_CELL_TYPE_PLACEHOLDER
 
-    valid_groups = [i for i in adata.obs["cell_type"].cat.categories if i != na_cell_type_placeholder]
+    valid_groups = [
+        i
+        for i in adata.obs["cell_type"].cat.categories
+        if i != na_cell_type_placeholder
+    ]
 
     sc_rank_genes_groups(
         adata=adata,

@@ -31,7 +31,9 @@ class ModelPlotting:
             return df[(df.index >= n)]
 
         if not (
-            isinstance(metrics_name, list) and len(metrics_name) > 0 and all([isinstance(i, str) for i in metrics_name])
+            isinstance(metrics_name, list)
+            and len(metrics_name) > 0
+            and all([isinstance(i, str) for i in metrics_name])
         ):
             raise ValueError
 
@@ -45,7 +47,10 @@ class ModelPlotting:
         ):
             raise ValueError
 
-        params = [(f"{i}_train", f"{i}_validation", j) for i, j in zip(metrics_name, metrics_title)]
+        params = [
+            (f"{i}_train", f"{i}_validation", j)
+            for i, j in zip(metrics_name, metrics_title)
+        ]
         if extra_triplets is not None:
             if not isinstance(extra_triplets, list) or not all(
                 [isinstance(i, tuple) and len(i) == 3 for i in extra_triplets]
@@ -62,8 +67,14 @@ class ModelPlotting:
                 stacklevel=settings.warnings_stacklevel,
             )
 
-        sanity_check = [j[i] for j in params for i in range(2) if j[i] not in self.history]
-        sanity_check = [sc for sc in sanity_check if not (sc.endswith("_validation") and validatation_calculated)]
+        sanity_check = [
+            j[i] for j in params for i in range(2) if j[i] not in self.history
+        ]
+        sanity_check = [
+            sc
+            for sc in sanity_check
+            if not (sc.endswith("_validation") and validatation_calculated)
+        ]
         if len(sanity_check) != 0:
             ValueError(f"Following metrics are not in model.history `{sanity_check}`.")
 
@@ -75,7 +86,11 @@ class ModelPlotting:
             params_iter = iter(params)
             n_params = len(params)
             n_ceil = math.ceil(n_params / n_col)
-            fig, axs = plt.subplots(nrows=n_ceil, ncols=n_col, figsize=(unit_size * 1 * n_col, n_ceil * unit_size))
+            fig, axs = plt.subplots(
+                nrows=n_ceil,
+                ncols=n_col,
+                figsize=(unit_size * 1 * n_col, n_ceil * unit_size),
+            )
             for i in range(n_ceil):
                 for j in range(n_col):
                     ax = axs[i, j] if n_ceil != 1 else axs[j]
@@ -88,7 +103,15 @@ class ModelPlotting:
                     if validatation_calculated:
                         ax.plot(_ignore_first(valid_data, ignore_first), **valid_kwargs)
                         ax.legend(fontsize=8)
-                    sns.despine(ax=ax, top=True, right=True, left=False, bottom=False, offset=None, trim=False)
+                    sns.despine(
+                        ax=ax,
+                        top=True,
+                        right=True,
+                        left=False,
+                        bottom=False,
+                        offset=None,
+                        trim=False,
+                    )
                     ax.set_title(title_str, fontsize=10)
 
             plt.tight_layout()
@@ -101,12 +124,20 @@ class ModelPlotting:
         lightness_max = 0.8  # Avoid near-white colors
 
         # Calculate the step to evenly distribute the gray tones within the range
-        step = (lightness_max - lightness_min) / max(1, num_variable - 1)  # Avoid division by zero
+        step = (lightness_max - lightness_min) / max(
+            1, num_variable - 1
+        )  # Avoid division by zero
 
         # Generate the gray tones with alpha values
         gray_tones_with_alpha = [
             mcolors.to_hex(
-                (lightness_min + i * step, lightness_min + i * step, lightness_min + i * step, alpha), keep_alpha=True
+                (
+                    lightness_min + i * step,
+                    lightness_min + i * step,
+                    lightness_min + i * step,
+                    alpha,
+                ),
+                keep_alpha=True,
             )
             for i in range(num_variable)
         ]
@@ -123,9 +154,13 @@ class ModelPlotting:
 
         if target_obs_key is not None:
             latent_representations_with_metadata = np.append(
-                latent_representation, adata_obs[target_obs_key].values.reshape(-1, 1), axis=1
+                latent_representation,
+                adata_obs[target_obs_key].values.reshape(-1, 1),
+                axis=1,
             )
-            columns = [f"Latent {i}" for i in range(self.module.n_latent)] + [target_obs_key]
+            columns = [f"Latent {i}" for i in range(self.module.n_latent)] + [
+                target_obs_key
+            ]
         else:
             latent_representations_with_metadata = latent_representation
             columns = [f"Latent {i}" for i in range(self.module.n_latent)]
@@ -143,8 +178,16 @@ class ModelPlotting:
         if latent_dim_of_interest is not None:
 
             with ignore_predetermined_warnings():
-                plt.figure(figsize=(individual_plot_size * 1.5, individual_plot_size * 1.5))
-                sns.kdeplot(df, x=f"Latent {latent_dim_of_interest}", hue=target_obs_key, fill=True, **kwargs)
+                plt.figure(
+                    figsize=(individual_plot_size * 1.5, individual_plot_size * 1.5)
+                )
+                sns.kdeplot(
+                    df,
+                    x=f"Latent {latent_dim_of_interest}",
+                    hue=target_obs_key,
+                    fill=True,
+                    **kwargs,
+                )
                 sns.despine(top=True, right=True, left=False, bottom=False)
                 if target_obs_key is not None:
                     plt.legend(loc="upper right")
@@ -156,7 +199,11 @@ class ModelPlotting:
             cols = math.ceil(total_plots**0.5)
             rows = math.ceil(total_plots / cols)
 
-            fig, axs = plt.subplots(rows, cols, figsize=(cols * individual_plot_size, rows * individual_plot_size))
+            fig, axs = plt.subplots(
+                rows,
+                cols,
+                figsize=(cols * individual_plot_size, rows * individual_plot_size),
+            )
 
             # Iterate over all latent dimensions to create individual plots
             for i in range(self.module.n_latent):
@@ -172,7 +219,13 @@ class ModelPlotting:
                 plot_legend = (row == 0) and (col == cols - 1 if cols > 1 else 0)
 
                 g = sns.kdeplot(
-                    data=df, x=f"Latent {i}", hue=target_obs_key, fill=True, ax=ax, legend=plot_legend, **kwargs
+                    data=df,
+                    x=f"Latent {i}",
+                    hue=target_obs_key,
+                    fill=True,
+                    ax=ax,
+                    legend=plot_legend,
+                    **kwargs,
                 )
                 if plot_legend and target_obs_key is not None:
                     sns.move_legend(g, "upper right")

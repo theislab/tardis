@@ -1,25 +1,19 @@
 #!/usr/bin/env python3
+import torch
+from typing import List, Optional
+
+from typing import List
+from ._disentenglementtargetconfigurations import Disentanglement
+from ._myconstants import REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 
 import numpy as np
 
-from ._disentenglementtargetconfigurations import DisentenglementTargetConfigurations
-from ._myconstants import REGISTRY_KEY_DISENTENGLEMENT_TARGETS
-from ._utils.functions import isnumeric
-
-
-class DisentenglementTargetManager:
-
-    configurations: "DisentenglementTargetConfigurations"
-    anndata_manager_state_registry: dict
-    _categorical_to_value: dict
-
-    @classmethod
-    def set_configurations(cls, value):
-        cls.configurations = value
-
-    @classmethod
-    def set_anndata_manager_state_registry(cls, value):
-        cls.anndata_manager_state_registry = value
+class DisentanglementTargetManager:
+    disentanglements: List[Disentanglement] = None
+    anndata_manager_state_registry: dict = {}
+    _obs_key_to_index: Optional[dict] = {}
+    n_total_reserved_latent: int = 0
+    n_latent = 0
 
     @classmethod
     def reset(cls):
@@ -28,18 +22,73 @@ class DisentenglementTargetManager:
         cls._categorical_to_value = dict()
 
     @classmethod
-    def get_categorical_to_value_dict(cls, obs_key):
-        try:
-            return cls._categorical_to_value[obs_key]
-        except KeyError:
-            array = cls.anndata_manager_state_registry[REGISTRY_KEY_DISENTENGLEMENT_TARGETS]["mappings"][obs_key]
-            is_numeric = all([isnumeric(element) for element in array])
-            # print(obs_key, is_numeric, [element.isnumeric() for element in array])
-            cls._categorical_to_value[obs_key] = {i: (float(j) if is_numeric else j) for i, j in enumerate(array)}
-            return cls._categorical_to_value[obs_key]
+    def set_disentanglements(cls, disentanglement_configs):
+        cls._validate_configurations(disentanglement_configs)
+        cls.disentanglements = []
+
+        for index, config in enumerate(disentanglement_configs):
+            obs_key = config["obs_key"]
+            disentanglement = Disentanglement(**config)
+            cls.disentanglements.append(disentanglement)
+            cls._obs_key_to_index[obs_key] = index
+            disentanglement.index = index
 
     @classmethod
-    def convert_array_categorical_to_value(cls, obs_key, array):
-        map_values = lambda x: cls.get_categorical_to_value_dict(obs_key)[x]
-        vectorized_map = np.vectorize(map_values)
-        return vectorized_map(array)
+    def set_anndata_manager_state_registry(cls, value):
+        cls.anndata_manager_state_registry = value
+
+        for disentanglement in cls.disentanglements:
+            obs_key = disentanglement.obs_key
+            mappings = value[REGISTRY_KEY_DISENTANGLEMENT_TARGETS]["mappings"][obs_key]
+            disentanglement.set_mappings(mappings)
+
+    @classmethod
+    def get_disentanglement(cls, at) -> str:
+        if isinstance(at, int):
+            if at >= len(cls.disentanglements):
+                raise ValueError("`index` is not available.")
+            index = at
+        elif isinstance(at, str):
+            if at not in cls._obs_key_to_index:
+                raise ValueError("`obs_key` is not available.")
+            index = cls._obs_key_to_index[at]
+        else:
+            raise ValueError("Invalid input.")
+        return cls.disentanglements[index]
+
+    @classmethod
+    def get_ordered_disentanglement_keys(cls):
+        return [disentanglement.obs_key for disentanglement in cls.disentanglements]
+
+    @classmethod
+    def _validate_configurations(cls, configurations):
+        obs_keys = set()
+        for config in configurations:
+            if config["obs_key"] in obs_keys:
+                raise ValueError("Duplicate `obs_key` is not allowed.")
+            obs_keys.add(config["obs_key"])
+
+    @classmethod
+    def set_indices(cls, n_latent):
+        cls.n_latent = n_latent
+        for disentanglement in cls.disentanglements:
+            start = cls.n_total_reserved_latent
+            end = start + disentanglement.n_reserved_latent
+
+            disentanglement.reserved_indices = torch.tensor(
+                list(range(start, end)), dtype=torch.int
+            )
+            disentanglement.unreserved_indices = torch.tensor(
+                list(range(0, start)) + list(range(end, n_latent)), dtype=torch.int
+            )
+
+            disentanglement.complete_indices = torch.tensor(
+                list(range(n_latent)), dtype=torch.int
+            )
+
+            cls.n_total_reserved_latent = end
+
+        if n_latent - cls.n_total_reserved_latent < 1:
+            raise ValueError(
+                "Not enough latent space variables to reserve for targets."
+            )

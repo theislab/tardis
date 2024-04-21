@@ -17,6 +17,8 @@ import scipy
 
 from ._myconstants import NA_CELL_TYPE_PLACEHOLDER, RANK_GENES_GROUPS_KEY
 
+from ._myconstants import NA_CELL_TYPE_PLACEHOLDER, RANK_GENES_GROUPS_KEY
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,7 +86,9 @@ class MetricsMixin:
                 _na = cell_type_is_not_na
 
             assert isinstance(cell_type_list, np.ndarray)
-            assert _na not in de_genes_dataframe.columns, f"Excepted cell-type is in DE dataframe: {_na}"
+            assert (
+                _na not in de_genes_dataframe.columns
+            ), f"Excepted cell-type is in DE dataframe: {_na}"
             cell_type_is_not_na = cell_type_list != _na
 
         for v, is_v_not_na in zip(cell_type_list, cell_type_is_not_na):
@@ -120,17 +124,25 @@ class MetricsMixin:
     @staticmethod
     def _de_genes_metrics_variables_creator(model, adata):
 
-        labels_full_name = model.adata_manager.get_state_registry(REGISTRY_KEYS.LABELS_KEY)["categorical_mapping"]
-        labels_full_name = {j: i for i, j in zip(range(len(labels_full_name)), labels_full_name)}
+        labels_full_name = model.adata_manager.get_state_registry(
+            REGISTRY_KEYS.LABELS_KEY
+        )["categorical_mapping"]
+        labels_full_name = {
+            j: i for i, j in zip(range(len(labels_full_name)), labels_full_name)
+        }
         try:
             de_genes_dataframe = pd.DataFrame(adata.uns[RANK_GENES_GROUPS_KEY]["names"])
         except KeyError as e:
-            raise KeyError("DEG key `{RANK_GENES_GROUPS_KEY}` are not found in `anndata.uns`.") from e
+            raise KeyError(
+                "DEG key `{RANK_GENES_GROUPS_KEY}` are not found in `anndata.uns`."
+            ) from e
         de_genes_dataframe.rename(columns=labels_full_name, inplace=True)
         return labels_full_name, de_genes_dataframe
 
     @staticmethod
-    def _calculate_r2_reconstruction_de_genes_masking_helper(np_arr, the_mask, is_not_na_arr):
+    def _calculate_r2_reconstruction_de_genes_masking_helper(
+        np_arr, the_mask, is_not_na_arr
+    ):
         n = the_mask.shape[0]
         np_arr = np_arr[the_mask]
         np_arr = np_arr.reshape(n, int(np_arr.size / n))
@@ -167,7 +179,9 @@ class MetricsMixin:
             return true, pred
 
         else:
-            raise ValueError("Error during the calculation of r2 scores for `de_genes`.")
+            raise ValueError(
+                "Error during the calculation of r2 scores for `de_genes`."
+            )
 
     @torch.inference_mode()
     @unsupported_if_adata_minified
@@ -179,29 +193,42 @@ class MetricsMixin:
         # 0 if all genes should be considered
         top_n_differentially_expressed_genes: int = 0,
         min_item_for_calculation: int = 10,
-        aggregate_method_datapoints: Literal["variance_weighted", "uniform_average", "flatten", "mean"] = "mean",
+        aggregate_method_datapoints: Literal[
+            "variance_weighted", "uniform_average", "flatten", "mean"
+        ] = "mean",
         verbose: bool = False,
         debug: bool = False,
     ) -> float:
         """Get reconstruction performance by R2 score."""
-        adata = self._validate_anndata(adata if adata is not None else self.adata_manager.adata)
-        
-        batch_size = (
-            (adata.n_obs if indices is None else min(adata.n_obs, len(indices))) if batch_size is None else batch_size
+        adata = self._validate_anndata(
+            adata if adata is not None else self.adata_manager.adata
         )
-        scdl = self._make_data_loader(adata=adata, indices=indices, batch_size=batch_size)
+        # The method gets means of the minibatch calculations at the end. For a more robust result,
+        # use the complete dataset as a `batch_size`.
+        batch_size = (
+            (adata.n_obs if indices is None else min(adata.n_obs, len(indices)))
+            if batch_size is None
+            else batch_size
+        )
+        scdl = self._make_data_loader(
+            adata=adata, indices=indices, batch_size=batch_size
+        )
         values = []
 
         if top_n_differentially_expressed_genes < 0:
             raise ValueError
         elif top_n_differentially_expressed_genes != 0:
-            labels_full_name, de_genes_dataframe = MetricsMixin._de_genes_metrics_variables_creator(
-                model=self, adata=adata
+            labels_full_name, de_genes_dataframe = (
+                MetricsMixin._de_genes_metrics_variables_creator(
+                    model=self, adata=adata
+                )
             )
 
         for tensors in tqdm.tqdm(scdl) if verbose else scdl:
             pred = (
-                self.module.my_sample(tensors=tensors, latent_space=False, return_dist=False, n_samples=1)
+                self.module.my_sample(
+                    tensors=tensors, latent_space=False, return_dist=False, n_samples=1
+                )
                 .cpu()
                 .numpy()
                 .mean(axis=0)  # aggregate 'n_sample's
@@ -228,16 +255,28 @@ class MetricsMixin:
                     adata_var_names=pd.Series(list(adata.var.index)),
                 )
 
-                true, pred = MetricsMixin._calculate_r2_reconstruction_de_genes_calculator(
-                    true, pred, masking_tensor, cell_type_is_not_na, min_item_for_calculation
+                true, pred = (
+                    MetricsMixin._calculate_r2_reconstruction_de_genes_calculator(
+                        true,
+                        pred,
+                        masking_tensor,
+                        cell_type_is_not_na,
+                        min_item_for_calculation,
+                    )
                 )
 
             if aggregate_method_datapoints not in ["flatten", "mean"]:
-                r2 = sklearn.metrics.r2_score(y_true=true, y_pred=pred, multioutput=aggregate_method_datapoints)
+                r2 = sklearn.metrics.r2_score(
+                    y_true=true, y_pred=pred, multioutput=aggregate_method_datapoints
+                )
             elif aggregate_method_datapoints == "flatten":
-                r2 = sklearn.metrics.r2_score(y_true=true.flatten(), y_pred=pred.flatten())
+                r2 = sklearn.metrics.r2_score(
+                    y_true=true.flatten(), y_pred=pred.flatten()
+                )
             elif aggregate_method_datapoints == "mean":  # not recommended
-                r2 = sklearn.metrics.r2_score(y_true=true.mean(axis=0), y_pred=pred.mean(axis=0))
+                r2 = sklearn.metrics.r2_score(
+                    y_true=true.mean(axis=0), y_pred=pred.mean(axis=0)
+                )
             else:
                 raise ValueError
 

@@ -1,4 +1,15 @@
-#!/usr/bin/env python3
+# TODO: minimize mutual information
+# TODO: kl-loss
+# TODO: Bhattacharyya distance
+# TODO: cosine similarity and cosine embedding loss
+# TODO: some other similarity based loss
+# TODO: constrastive loss: F.triplet_margin_loss, F.triplet_margin_with_distance_loss
+# TODO: making reserved variables as multivariate normal, calculating kl accordingly?
+
+# Notes:
+# - When only reserved is active for `sex`, you have two blob at the end.
+# - When unreserved loss is also active you have one blob.
+# - The second makes sure the same cell types are put together as we have `within_label` option activated.
 
 import logging
 import warnings
@@ -9,47 +20,32 @@ from scvi.module import VAE
 from scvi.module.base import LossOutput, auto_move_data
 from torch.distributions import kl_divergence as kl
 
-from ._auxillarylossesmixin import AuxillaryLossesMixin
-from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._disentenglementtargetmanager import DisentanglementTargetManager
 from ._metricsmixin import ModuleMetricsMixin
 from ._myconstants import (
     AUXILLARY_LOSS_MEAN,
+    minified_method_not_supported_message,
+    REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS,
+    POSITIVE_EXAMPLE_KEY,
+    NEGATIVE_EXAMPLE_KEY,
     LOSS_NAMING_DELIMITER,
     WEIGHTED_LOSS_SUFFIX,
-    REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS,
-    minified_method_not_supported_message,
 )
+
 
 torch.backends.cudnn.benchmark = True
 
 logger = logging.getLogger(__name__)
 
 
-class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
+class MyModule(VAE, ModuleMetricsMixin):
 
     def __init__(self, *args, include_auxillary_loss: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # Modify `DisentenglementTargetManager` to define reserved latents in loss calculations.
-        self.n_total_reserved_latent = 0
-        for dtconfig in DisentenglementTargetManager.configurations.items:
-            dtconfig.reserved_latent_indices = list(
-                range(self.n_total_reserved_latent, self.n_total_reserved_latent + dtconfig.n_reserved_latent)
-            )
-            dtconfig.unreserved_latent_indices = [
-                i for i in range(self.n_latent) if i not in dtconfig.reserved_latent_indices
-            ]
-            self.n_total_reserved_latent += dtconfig.n_reserved_latent
-        if self.n_latent - self.n_total_reserved_latent < 1:
-            raise ValueError("Not enough latent space variables to reserve for targets.")
-        self.n_total_unreserved_latent = self.n_latent - self.n_total_reserved_latent
-        DisentenglementTargetManager.configurations.unreserved_latent_indices = list(
-            range(self.n_total_reserved_latent, self.n_latent)
-        )  # If no target is defined, this list will contain all latent space variables.
-        DisentenglementTargetManager.configurations.latent_indices = list(range(self.n_latent))
-
         self.auxillary_losses_keys: list[str] | None = None
         self.include_auxillary_loss = include_auxillary_loss
+
+        # Modify `DisentanglementTargetManager` to define reserved latents in loss calculations.
 
         # Remove the variable got from VAE initialization due to it is inherited from BaseMinifiedModeModuleClass.
         del self._minified_data_type
@@ -120,18 +116,33 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
         qz, z = self.z_encoder(encoder_input, batch_index, *categorical_input)
         ql = None
         if not self.use_observed_lib_size:
-            ql, library_encoded = self.l_encoder(encoder_input, batch_index, *categorical_input)
+            ql, library_encoded = self.l_encoder(
+                encoder_input, batch_index, *categorical_input
+            )
             library = library_encoded
 
         if n_samples > 1:
             untran_z = qz.sample((n_samples,))
             z = self.z_encoder.z_transformation(untran_z)
             if self.use_observed_lib_size:
-                library = library.unsqueeze(0).expand((n_samples, library.size(0), library.size(1)))
+                library = library.unsqueeze(0).expand(
+                    (n_samples, library.size(0), library.size(1))
+                )
             else:
                 library = ql.sample((n_samples,))
         outputs = {"z": z, "qz": qz, "ql": ql, "library": library}
         return outputs
+
+    @torch.inference_mode()
+    @auto_move_data
+    def inference_counteractive_minibatch(self, counteractive_minibatch_tensors):
+        counteractive_inference_inputs = self._get_inference_input(
+            counteractive_minibatch_tensors
+        )
+        counteractive_inference_outputs = self.inference(
+            **counteractive_inference_inputs
+        )
+        return counteractive_inference_outputs
 
     def loss(
         self,
@@ -141,7 +152,9 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
         kl_weight: float = 1.0,
     ):
         x = tensors[REGISTRY_KEYS.X_KEY]
-        kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(dim=-1)
+        kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(
+            dim=-1
+        )
         if not self.use_observed_lib_size:
             kl_divergence_l = kl(
                 inference_outputs["ql"],
@@ -158,46 +171,81 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
         # Note that `kl_weight` is determined dynamically depending on `n_epochs_kl_warmup` parameter.
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
-        # `weighted_auxillary_losses` is also determined dynamically, depending on `warmup_epoch_range` parameter.
-        
-        if REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS in tensors:
-            # Then we are using the MyAnnDataLoader, which includes the counteractive minibatches. This happens
-            # when the model is in training phase. Have a look at the `_data_loader_cls` in Model.
-            # Removing this if-else loop causes model not loadable from drive.
-            weighted_auxillary_losses, auxillary_losses = self.calculate_auxillary_losses(tensors, inference_outputs)
-        else:
-            weighted_auxillary_losses, auxillary_losses = dict(), dict()
-        
-        
-        if len(weighted_auxillary_losses) > 0:
-            total_weighted_auxillary_losses = torch.sum(torch.stack(list(weighted_auxillary_losses.values())), dim=0)
-            total_auxillary_losses = torch.sum(torch.stack(list(auxillary_losses.values())), dim=0)
-        else:
-            total_weighted_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(reconst_loss.device)
-            total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(reconst_loss.device)
+        auxillary_losses = {}
+        weighted_auxillary_losses = {}
 
-        # Report the losses
-        report_auxillary_losses = dict()
-        report_auxillary_losses.update({i: torch.mean(auxillary_losses[i]) for i in auxillary_losses})
-        report_auxillary_losses[AUXILLARY_LOSS_MEAN] = torch.mean(total_auxillary_losses)
+        for disentanglement in DisentanglementTargetManager.disentanglements:
+            obs_key = disentanglement.obs_key
+            positive_inputs = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][
+                obs_key
+            ][POSITIVE_EXAMPLE_KEY]
+            negative_inputs = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][
+                obs_key
+            ][NEGATIVE_EXAMPLE_KEY]
+            inference_counteractive_positive = self.inference_counteractive_minibatch(
+                positive_inputs
+            )
+            inference_counteractive_negative = self.inference_counteractive_minibatch(
+                negative_inputs
+            )
+
+            cur_weighted_loss, cur_loss = disentanglement.get_total_loss(
+                tensors,
+                positive_inputs,
+                negative_inputs,
+                inference_outputs,
+                inference_counteractive_positive,
+                inference_counteractive_negative,
+            )
+
+            weighted_auxillary_losses.update(cur_weighted_loss)
+            auxillary_losses.update(cur_loss)
+
+        if len(auxillary_losses) > 0:
+            total_weighted_auxillary_losses = torch.sum(
+                torch.stack(list(auxillary_losses.values())), dim=0
+            )
+            total_auxillary_losses = torch.sum(
+                torch.stack(list(auxillary_losses.values())), dim=0
+            )
+        else:
+            weighted_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(
+                reconst_loss.device
+            )
+            total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(
+                reconst_loss.device
+            )
+
+        report_auxillary_losses = {
+            k: torch.mean(v) for k, v in auxillary_losses.items()
+        }
+        report_auxillary_losses[AUXILLARY_LOSS_MEAN] = torch.mean(
+            total_auxillary_losses
+        )
+
         # Also report weighted losses. Note that this is not used in progress bar etc, as like `kl_local`.
         report_auxillary_losses.update(
             {
-                LOSS_NAMING_DELIMITER.join([i, WEIGHTED_LOSS_SUFFIX]): torch.mean(weighted_auxillary_losses[i])
+                LOSS_NAMING_DELIMITER.join([i, WEIGHTED_LOSS_SUFFIX]): torch.mean(
+                    weighted_auxillary_losses[i]
+                )
                 for i in weighted_auxillary_losses
             }
         )
-        report_auxillary_losses[LOSS_NAMING_DELIMITER.join([AUXILLARY_LOSS_MEAN, WEIGHTED_LOSS_SUFFIX])] = torch.mean(
-            total_weighted_auxillary_losses
-        )
+
+        report_auxillary_losses[
+            LOSS_NAMING_DELIMITER.join([AUXILLARY_LOSS_MEAN, WEIGHTED_LOSS_SUFFIX])
+        ] = torch.mean(total_weighted_auxillary_losses)
         # Also report kl after weighting
-        report_auxillary_losses[LOSS_NAMING_DELIMITER.join(["kl_local", WEIGHTED_LOSS_SUFFIX])] = torch.mean(
-            weighted_kl_local
-        )
+        report_auxillary_losses[
+            LOSS_NAMING_DELIMITER.join(["kl_local", WEIGHTED_LOSS_SUFFIX])
+        ] = torch.mean(weighted_kl_local)
 
         # Add to the total loss, or do not add for debugging etc purposes
         if self.include_auxillary_loss:
-            loss = torch.mean(reconst_loss + weighted_kl_local + total_weighted_auxillary_losses)
+            loss = torch.mean(
+                reconst_loss + weighted_kl_local + total_weighted_auxillary_losses
+            )
         else:
             warnings.warn(
                 message="Auxillary loss is not added to the total loss. (include_auxillary_loss=False)",
@@ -211,9 +259,12 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
             "kl_divergence_z": kl_divergence_z,
         }
 
-        if self.auxillary_losses_keys is None and len(weighted_auxillary_losses) > 0:
-            self.auxillary_losses_keys = list(weighted_auxillary_losses.keys())
+        if self.auxillary_losses_keys is None and len(auxillary_losses) > 0:
+            self.auxillary_losses_keys = list(auxillary_losses.keys())
 
         return LossOutput(
-            loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_local, extra_metrics=report_auxillary_losses
+            loss=loss,
+            reconstruction_loss=reconst_loss,
+            kl_local=kl_local,
+            extra_metrics=report_auxillary_losses,
         )

@@ -77,7 +77,9 @@ class MyUnsupervisedTrainingMixin(UnsupervisedTrainingMixin):
                 validation_size=validation_size,
                 batch_size=batch_size,
                 shuffle_set_split=shuffle_set_split,
-                distributed_sampler=use_distributed_sampler(trainer_kwargs.get("strategy", None)),
+                distributed_sampler=use_distributed_sampler(
+                    trainer_kwargs.get("strategy", None)
+                ),
                 load_sparse_tensor=load_sparse_tensor,
                 **datasplitter_kwargs,
             )
@@ -86,7 +88,11 @@ class MyUnsupervisedTrainingMixin(UnsupervisedTrainingMixin):
             training_plan = self._training_plan_cls(self.module, **plan_kwargs)
 
             es = "early_stopping"
-            trainer_kwargs[es] = early_stopping if es not in trainer_kwargs.keys() else trainer_kwargs[es]
+            trainer_kwargs[es] = (
+                early_stopping
+                if es not in trainer_kwargs.keys()
+                else trainer_kwargs[es]
+            )
             runner = self._train_runner_cls(
                 self,
                 training_plan=training_plan,
@@ -104,5 +110,8 @@ class MyUnsupervisedTrainingMixin(UnsupervisedTrainingMixin):
             if hasattr(self, "wandb_logger"):
                 self.wandb_logger.experiment.finish(exit_code=exit_code, quiet=True)
                 if self.wandb_logger_verbose:
-                    wandb_message_finalized = f"W&B logger finalized successfully: \n" f"Exit Code: {exit_code}\n"
+                    wandb_message_finalized = (
+                        f"W&B logger finalized successfully: \n"
+                        f"Exit Code: {exit_code}\n"
+                    )
                     print(wandb_message_finalized)

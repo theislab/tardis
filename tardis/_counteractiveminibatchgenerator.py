@@ -10,7 +10,7 @@ from ._cachedpossiblegroupdefinitionindices import (
     CachedPossibleGroupDefinitionIndices,
     DatapointDefinitionsKeyGenerator,
 )
-from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._disentenglementtargetmanager import DisentanglementTargetManager
 from ._myconstants import NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY
 from ._trainingsteplogger import TrainingStepLogger
 
@@ -28,7 +28,7 @@ class CounteractiveMinibatchGenerator:
         - method: Name of the method to use for generating the minibatch.
         - **kwargs: Keyword arguments passed to the method, including method-specific kwargs and common parameters.
         """
-        method = DisentenglementTargetManager.configurations.get_by_index(
+        method = DisentanglementTargetManager.get_disentanglement(
             target_obs_key_ind
         ).counteractive_minibatch_settings.method
         if (
@@ -36,7 +36,9 @@ class CounteractiveMinibatchGenerator:
             or method == "main"
             or not callable(getattr(cls, method))
         ):
-            raise AttributeError(f"{cls.__name__} does not have a callable attribute '{method}'.")
+            raise AttributeError(
+                f"{cls.__name__} does not have a callable attribute '{method}'."
+            )
         else:
             class_function = getattr(cls, method)
             return class_function(target_obs_key_ind=target_obs_key_ind, **kwargs)
@@ -59,24 +61,37 @@ class CounteractiveMinibatchGenerator:
         minibatch_relative_index: list[int],
     ) -> Dict[str, list[int]]:
 
-        config = DisentenglementTargetManager.configurations.items[target_obs_key_ind].counteractive_minibatch_settings
+        config = DisentanglementTargetManager.disentanglements[
+            target_obs_key_ind
+        ].counteractive_minibatch_settings
         possible_indices = CachedPossibleGroupDefinitionIndices.get(
-            dataset_tensors, target_obs_key_ind, data_split_identifier, splitter_index, config
+            dataset_tensors,
+            target_obs_key_ind,
+            data_split_identifier,
+            splitter_index,
+            config,
         )
         minibatch_definitions = (
-            DatapointDefinitionsKeyGenerator.create_definitions(minibatch_tensors, target_obs_key_ind, config)
+            DatapointDefinitionsKeyGenerator.create_definitions(
+                minibatch_tensors, target_obs_key_ind, config
+            )
             .clone()  # prevent misbehavior at below randomization operation. testing needed for method training speed.
             .numpy()  # as it returns a tensor originally.
         )
 
-        selection = {POSITIVE_EXAMPLE_KEY: minibatch_definitions.copy(), NEGATIVE_EXAMPLE_KEY: None}
+        selection = {
+            POSITIVE_EXAMPLE_KEY: minibatch_definitions.copy(),
+            NEGATIVE_EXAMPLE_KEY: None,
+        }
 
         rng = np.random.default_rng(  # Seeded RNG for consistency
-            seed=CounteractiveMinibatchGenerator.configuration_random_seed(config.method_kwargs["seed"])
+            seed=CounteractiveMinibatchGenerator.configuration_random_seed(
+                config.method_kwargs["seed"]
+            )
         )
-        n_cat = DisentenglementTargetManager.anndata_manager_state_registry["disentenglement_target"]["n_cats_per_key"][
-            target_obs_key_ind
-        ]
+        n_cat = DisentanglementTargetManager.anndata_manager_state_registry[
+            "disentanglement_target"
+        ]["n_cats_per_key"][target_obs_key_ind]
         indice_group_definitions = 0
         random_ints = rng.integers(0, n_cat, size=minibatch_definitions.shape[0])
         minibatch_definitions[:, indice_group_definitions] = np.where(
@@ -89,18 +104,25 @@ class CounteractiveMinibatchGenerator:
         selected_elements = dict()
         for selection_key, selection_minibatch_definitions in selection.items():
             _selected_elements = []
-            for datapoint, datapoint_index in zip(selection_minibatch_definitions, minibatch_relative_index):
+            for datapoint, datapoint_index in zip(
+                selection_minibatch_definitions, minibatch_relative_index
+            ):
                 try:
                     if selection_key == POSITIVE_EXAMPLE_KEY:
                         # choose randomly but exclude the datapoint itself.
                         _selected_element = datapoint_index
                         overhead_counter = 0
                         while _selected_element == datapoint_index:
-                            _selected_element = rng.choice(possible_indices[tuple(datapoint)])
+                            _selected_element = rng.choice(
+                                possible_indices[tuple(datapoint)]
+                            )
                             overhead_counter += 1
                             if overhead_counter > 1e4:
                                 # as masking etc is costly, simply raise error after trying generous amount of time
-                                to_report = {i: len(possible_indices[i]) for i in possible_indices}
+                                to_report = {
+                                    i: len(possible_indices[i])
+                                    for i in possible_indices
+                                }
                                 raise ValueError(
                                     "The positive example could not be chosen randomly when the anchor itself "
                                     "is excluded. It is likely that some categories in the cached possible indices "
@@ -108,7 +130,9 @@ class CounteractiveMinibatchGenerator:
                                 )
                         _selected_elements.append(_selected_element)
                     else:
-                        _selected_elements.append(rng.choice(possible_indices[tuple(datapoint)]))
+                        _selected_elements.append(
+                            rng.choice(possible_indices[tuple(datapoint)])
+                        )
                 except KeyError as e:
                     to_report = {i: len(possible_indices[i]) for i in possible_indices}
                     raise KeyError(

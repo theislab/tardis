@@ -3,11 +3,14 @@
 import torch.utils.data._utils
 from scvi.dataloaders import DataSplitter
 from scvi.dataloaders._ann_dataloader import AnnDataLoader
-from torch.utils.data.dataloader import _BaseDataLoaderIter, _SingleProcessDataLoaderIter
+from torch.utils.data.dataloader import (
+    _BaseDataLoaderIter,
+    _SingleProcessDataLoaderIter,
+)
 
 from ._counteractiveminibatchgenerator import CounteractiveMinibatchGenerator
-from ._disentenglementtargetmanager import DisentenglementTargetManager
-from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS
+from ._disentenglementtargetmanager import DisentanglementTargetManager
+from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS
 
 
 class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
@@ -20,15 +23,17 @@ class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
         index = self._next_index()  # may raise StopIteration
         data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
 
-        if len(DisentenglementTargetManager.configurations) > 0:
-            data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS] = dict()
+        if len(DisentanglementTargetManager.disentanglements) > 0:
+            data[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS] = dict()
             # `data` is simply the minibatch itself.
             # The aim is create alternative minibatches that has the same keys as the original one
             # These minibatches, called counteractive minibatch, will be fed through `forward` method.
             for target_obs_key_ind, target_obs_key in enumerate(
-                DisentenglementTargetManager.configurations.get_ordered_obs_key()
+                DisentanglementTargetManager.get_ordered_disentanglement_keys()
             ):
-                data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key] = dict()
+                data[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][
+                    target_obs_key
+                ] = dict()
                 target_obs_key_tensors_indices_dict = CounteractiveMinibatchGenerator.main(
                     target_obs_key_ind=target_obs_key_ind,
                     # Full dataset and minibatch, loaded tensors can be configured by setup_anndata.
@@ -42,15 +47,22 @@ class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
                     # Note that this is index of `self._dataset.indices`, not the index of real full dataset.
                     minibatch_relative_index=index,
                 )
-                for selection_key, target_obs_key_tensors_indices in target_obs_key_tensors_indices_dict.items():
-                    target_obs_key_tensors = self._dataset_fetcher.fetch(target_obs_key_tensors_indices)
-                    data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key][
+                for (
+                    selection_key,
+                    target_obs_key_tensors_indices,
+                ) in target_obs_key_tensors_indices_dict.items():
+                    target_obs_key_tensors = self._dataset_fetcher.fetch(
+                        target_obs_key_tensors_indices
+                    )
+                    data[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][target_obs_key][
                         selection_key
                     ] = target_obs_key_tensors
 
         if self._pin_memory:
             # It is a recursive function, so deep dict objects should not interfere the process.
-            data = torch.utils.data._utils.pin_memory.pin_memory(data, self._pin_memory_device)
+            data = torch.utils.data._utils.pin_memory.pin_memory(
+                data, self._pin_memory_device
+            )
         return data
 
 
@@ -62,7 +74,9 @@ class MyAnnDataLoader(AnnDataLoader):
 
     def _get_iterator(self) -> "_BaseDataLoaderIter":  # torch.DataLoader method
         if self.num_workers == 0:
-            return _MySingleProcessDataLoaderIter(loader=self, data_split_identifier=self.data_split_identifier)
+            return _MySingleProcessDataLoaderIter(
+                loader=self, data_split_identifier=self.data_split_identifier
+            )
         else:
             raise NotImplementedError(
                 f"Multiprocessed data loaader not implemented for {MODEL_NAME} model. "
@@ -126,8 +140,13 @@ class MyDataSplitter(DataSplitter):
         """Recursively converts all sparse tensors in a nested dictionary to dense tensors."""
         for key, value in batch.items():
             if isinstance(value, dict):
-                batch[key] = MyDataSplitter.convert_sparse_to_dense(value)  # Recursive call for nested dictionaries
-            elif isinstance(value, torch.Tensor) and value.layout in (torch.sparse_csr, torch.sparse_csc):
+                batch[key] = MyDataSplitter.convert_sparse_to_dense(
+                    value
+                )  # Recursive call for nested dictionaries
+            elif isinstance(value, torch.Tensor) and value.layout in (
+                torch.sparse_csr,
+                torch.sparse_csc,
+            ):
                 batch[key] = value.to_dense()  # Convert sparse tensor to dense
         return batch
 
