@@ -21,17 +21,15 @@ from scvi.dataloaders._ann_dataloader import AnnDataLoader
 from scvi.model._utils import _init_library_size
 from scvi.model.base import ArchesMixin, BaseModelClass, RNASeqMixin, VAEMixin
 
-from ._auxillarylosswarmupmanager import AuxillaryLossWarmupManager
-from ._cachedpossiblegroupdefinitionindices import CachedPossibleGroupDefinitionIndices
-from ._disentenglementtargetconfigurations import DisentenglementTargetConfigurations
-from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._counteractivegenerator import CachedPossibleGroupDefinitionIndices
+from ._disentenglement import Disentenglements
+from ._disentenglementmanager import DisentenglementManager
 from ._metricsmixin import MetricsMixin
 from ._modelplotting import ModelPlotting
 from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
 from ._mymodule import MyModule
+from ._mymonitor import AuxillaryLossWarmupManager, ProgressBarManager, TrainingEpochLogger, TrainingStepLogger
 from ._mytrainingmixin import MyUnsupervisedTrainingMixin
-from ._progressbarmanager import ProgressBarManager
-from ._trainingsteplogger import TrainingEpochLogger, TrainingStepLogger
 from ._utils.wandb import check_wandb_configurations
 from ._utils.warnings import ignore_predetermined_warnings
 
@@ -45,7 +43,7 @@ class MyModel(
 
     _module_cls = MyModule
     # Keep the original AnndataLoader for everything else other than training.
-    # This causes to miss the counteractive minibatch generation for other things. 
+    # This causes to miss the counteractive minibatch generation for other things.
     _data_loader_cls = AnnDataLoader
 
     def __init__(self, adata: AnnData, **kwargs):
@@ -101,15 +99,13 @@ class MyModel(
         TrainingEpochLogger.reset()
         AuxillaryLossWarmupManager.reset()
         ProgressBarManager.reset()
-        DisentenglementTargetManager.reset()
+        DisentenglementManager.reset()
         CachedPossibleGroupDefinitionIndices.reset()
 
         if disentenglement_targets_configurations is None:
             disentenglement_targets_configurations = []
         # This also checks whether the dict follows the format required.
-        disentenglement_targets_configurations = DisentenglementTargetConfigurations(
-            items=disentenglement_targets_configurations
-        )
+        disentenglement_targets_configurations = Disentenglements(items=disentenglement_targets_configurations)
 
         _dtsak = disentenglement_targets_configurations.get_ordered_obs_key()
         disentenglement_targets_setup_anndata_keys = _dtsak if len(_dtsak) > 0 else None
@@ -129,8 +125,8 @@ class MyModel(
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
 
-        DisentenglementTargetManager.set_configurations(value=disentenglement_targets_configurations)
-        DisentenglementTargetManager.set_anndata_manager_state_registry(
+        DisentenglementManager.set_configurations(value=disentenglement_targets_configurations)
+        DisentenglementManager.set_anndata_manager_state_registry(
             value={
                 registry_key: adata_manager.registry["field_registries"][registry_key]["state_registry"]
                 for registry_key in adata_manager.registry["field_registries"]

@@ -4,9 +4,9 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator, validator
 
-from ._auxillarylosswarmupmanager import AuxillaryLossWarmupManager
+from ._mymonitor import AuxillaryLossWarmupManager
 from ._myconstants import EXAMPLE_KEYS, LATENT_INDEX_GROUP_NAMES, LOSS_NAMING_DELIMITER, LOSS_NAMING_PREFIX
-from ._progressbarmanager import ProgressBarManager
+from ._mymonitor import ProgressBarManager
 
 
 class TardisLoss(BaseModel):
@@ -82,7 +82,7 @@ class TardisLoss(BaseModel):
         # Add index to each configuration post-initialization
 
 
-class CounteractiveMinibatchSettings(BaseModel):
+class CounteractiveSettings(BaseModel):
     method: StrictStr
     # Accepts any dict without specific type checking.
     method_kwargs: dict
@@ -104,10 +104,10 @@ class AuxillaryLosses(BaseModel):
         raise KeyError("`identifier` is not amongst the defined losses.")
 
 
-class DisentenglementTargetConfiguration(BaseModel):
+class Disentenglement(BaseModel):
     obs_key: StrictStr
     n_reserved_latent: StrictInt
-    counteractive_minibatch_settings: CounteractiveMinibatchSettings
+    counteractive_minibatch_settings: CounteractiveSettings
     auxillary_losses: List[TardisLoss] = []
     # This is set after the initialization based on the index of the target in the provided list.
     index: Optional[int] = None
@@ -150,8 +150,8 @@ class DisentenglementTargetConfiguration(BaseModel):
             )
 
 
-class DisentenglementTargetConfigurations(BaseModel):
-    items: List[DisentenglementTargetConfiguration] = []
+class Disentenglements(BaseModel):
+    items: List[Disentenglement] = []
     # unreserved by any of the configuration.
     unreserved_latent_indices: Optional[List[int]] = None
     # complete list of indices, simply range(n_latent)

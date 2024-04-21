@@ -7,8 +7,7 @@ from scvi.module.base import LossOutput
 from scvi.train import TrainingPlan
 from scvi.train._metrics import ElboMetric
 
-from ._progressbarmanager import ProgressBarManager
-from ._trainingsteplogger import TrainingEpochLogger, TrainingStepLogger
+from ._mymonitor import ProgressBarManager, TrainingEpochLogger, TrainingStepLogger
 
 
 class MyTrainingPlan(TrainingPlan):

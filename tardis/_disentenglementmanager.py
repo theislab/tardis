@@ -2,14 +2,14 @@
 
 import numpy as np
 
-from ._disentenglementtargetconfigurations import DisentenglementTargetConfigurations
+from ._disentenglement import Disentenglements
 from ._myconstants import REGISTRY_KEY_DISENTENGLEMENT_TARGETS
 from ._utils.functions import isnumeric
 
 
-class DisentenglementTargetManager:
+class DisentenglementManager:
 
-    configurations: "DisentenglementTargetConfigurations"
+    configurations: "Disentenglements"
     anndata_manager_state_registry: dict
     _categorical_to_value: dict
 

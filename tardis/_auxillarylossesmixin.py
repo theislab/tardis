@@ -2,15 +2,13 @@
 
 from typing import Dict, List
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 from scvi import REGISTRY_KEYS
 from scvi.module.base import auto_move_data
 from torch.distributions import Normal, kl_divergence
 
-from ._auxillarylosswarmupmanager import AuxillaryLossWarmupManager
-from ._disentenglementtargetmanager import DisentenglementTargetManager as DTM
+from ._disentenglementmanager import DisentenglementManager as DTM
 from ._myconstants import (
     BOTH_EXAMPLE_KEY,
     LATENT_INDEX_GROUP_COMPLETE,
@@ -22,7 +20,7 @@ from ._myconstants import (
     REGISTRY_KEY_DISENTENGLEMENT_TARGETS,
     REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS,
 )
-from ._trainingsteplogger import TrainingEpochLogger
+from ._mymonitor import AuxillaryLossWarmupManager, TrainingEpochLogger
 
 
 class FinalTransformation:
@@ -228,7 +226,7 @@ class AuxillaryLossesMixin:
             raise ValueError("Undefined counteractive example key.")
 
     def cosine_embedding_with_reparametrized_z(self, t, tp, tn, i, io, iop, ion, rli, c):
-        lg = c.latent_group
+        # lg = c.latent_group
         # ce = c.counteractive_example
         # DEBUG.x1 = ion["z"][:, rli[lg]]
         # DEBUG.x2 = io["z"][:, rli[lg]]

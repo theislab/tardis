@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+import copy
+
+import numpy as np
+from tardis._myconstants import PROGRESS_BAR_METRICS_KEYS, PROGRESS_BAR_METRICS_MODES
+
 
 class TrainingEpochLogger:
     current: int
@@ -53,3 +58,53 @@ class TrainingStepLogger:
         for key in cls.__dict__.keys():
             if not key.startswith("__") and not callable(getattr(cls, key)):
                 print(f"{key} = {getattr(cls, key)}")
+
+
+class ProgressBarManager:
+
+    keys: set[str]
+    modes: set[str]
+
+    @classmethod
+    def reset(cls):
+        cls.keys = copy.deepcopy(PROGRESS_BAR_METRICS_KEYS)
+        cls.modes = copy.deepcopy(PROGRESS_BAR_METRICS_MODES)
+
+    @classmethod
+    def add(cls, metric_name):
+        try:
+            cls.keys.add(metric_name)
+        except NameError as e:
+            raise NameError("The class should be initialized in `setup_anndata` by `reset` method.") from e
+
+
+class AuxillaryLossWarmupManager:
+
+    items: dict
+    _items_helper: dict
+
+    @classmethod
+    def reset(cls):
+        cls.items = dict()
+        cls._items_helper = dict()
+
+    @classmethod
+    def add(cls, key, range_list: list | None):
+        if range_list is None:
+            i = -1
+            j = -2
+        else:
+            i, j = range_list
+
+        cls.items[key] = range_list
+        cls._items_helper[key] = (np.arange(i, j + 1) - i) / (j + 1 - i)
+
+    @classmethod
+    def get(cls, key, epoch):
+        i, j = cls.items[key]
+        if epoch < i:
+            return 0.0
+        elif epoch > j:
+            return 1.0
+        else:
+            return cls._items_helper[key][epoch - i]

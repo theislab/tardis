@@ -5,8 +5,8 @@ from scvi.dataloaders import DataSplitter
 from scvi.dataloaders._ann_dataloader import AnnDataLoader
 from torch.utils.data.dataloader import _BaseDataLoaderIter, _SingleProcessDataLoaderIter
 
-from ._counteractiveminibatchgenerator import CounteractiveMinibatchGenerator
-from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._counteractivegenerator import CounteractiveGenerator
+from ._disentenglementmanager import DisentenglementManager
 from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS
 
 
@@ -20,16 +20,16 @@ class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
         index = self._next_index()  # may raise StopIteration
         data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
 
-        if len(DisentenglementTargetManager.configurations) > 0:
+        if len(DisentenglementManager.configurations) > 0:
             data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS] = dict()
             # `data` is simply the minibatch itself.
             # The aim is create alternative minibatches that has the same keys as the original one
             # These minibatches, called counteractive minibatch, will be fed through `forward` method.
             for target_obs_key_ind, target_obs_key in enumerate(
-                DisentenglementTargetManager.configurations.get_ordered_obs_key()
+                DisentenglementManager.configurations.get_ordered_obs_key()
             ):
                 data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key] = dict()
-                target_obs_key_tensors_indices_dict = CounteractiveMinibatchGenerator.main(
+                target_obs_key_tensors_indices_dict = CounteractiveGenerator.main(
                     target_obs_key_ind=target_obs_key_ind,
                     # Full dataset and minibatch, loaded tensors can be configured by setup_anndata.
                     minibatch_tensors=data,
