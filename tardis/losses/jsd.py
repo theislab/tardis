@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
+
+from typing import Dict
+
 import torch
 from torch.distributions import Normal
 from torch.distributions.kl import kl_divergence
-from typing import Dict
 
 from .base import TardisLoss
 
@@ -14,9 +17,7 @@ class JSDNormal(TardisLoss):
         counteractive_outputs: Dict[str, torch.Tensor],
         relevant_latent_indices: torch.Tensor,
     ) -> torch.Tensor:
-        self._validate_forward_inputs(
-            outputs, counteractive_outputs, relevant_latent_indices
-        )
+        self._validate_forward_inputs(outputs, counteractive_outputs, relevant_latent_indices)
         qz_inference = outputs["qz"]
         qz_counteractive = counteractive_outputs["qz"]
 
@@ -53,7 +54,7 @@ class JSD(TardisLoss):
         target_type: str = "categorical",
         method_kwargs: Dict[str, any] = {},
     ) -> None:
-        super(JSD, self).__init__(
+        super().__init__(
             weight=weight,
             is_minimized=is_minimized,
             transformation=transformation,
@@ -84,6 +85,4 @@ class JSD(TardisLoss):
         relevant_latent_indices: torch.Tensor,
     ) -> torch.Tensor:
 
-        return self._jsd._forward(
-            outputs, counteractive_outputs, relevant_latent_indices
-        )
+        return self._jsd._forward(outputs, counteractive_outputs, relevant_latent_indices)

@@ -1,9 +1,10 @@
+#!/usr/bin/env python3
+
 from .cosine_similarity import CosineSimilarity
-from .wasserstein import WassersteinLoss
 from .jsd import JSD
 from .mae import MAE
 from .mse import MSE
-
+from .wasserstein import WassersteinLoss
 
 LOSSES = {
     "cosine_similarity": CosineSimilarity,

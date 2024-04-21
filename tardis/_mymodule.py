@@ -1,15 +1,4 @@
-# TODO: minimize mutual information
-# TODO: kl-loss
-# TODO: Bhattacharyya distance
-# TODO: cosine similarity and cosine embedding loss
-# TODO: some other similarity based loss
-# TODO: constrastive loss: F.triplet_margin_loss, F.triplet_margin_with_distance_loss
-# TODO: making reserved variables as multivariate normal, calculating kl accordingly?
-
-# Notes:
-# - When only reserved is active for `sex`, you have two blob at the end.
-# - When unreserved loss is also active you have one blob.
-# - The second makes sure the same cell types are put together as we have `within_label` option activated.
+#!/usr/bin/env python3
 
 import logging
 import warnings
@@ -24,14 +13,13 @@ from ._disentenglementtargetmanager import DisentanglementTargetManager
 from ._metricsmixin import ModuleMetricsMixin
 from ._myconstants import (
     AUXILLARY_LOSS_MEAN,
-    minified_method_not_supported_message,
-    REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS,
-    POSITIVE_EXAMPLE_KEY,
-    NEGATIVE_EXAMPLE_KEY,
     LOSS_NAMING_DELIMITER,
+    NEGATIVE_EXAMPLE_KEY,
+    POSITIVE_EXAMPLE_KEY,
+    REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS,
     WEIGHTED_LOSS_SUFFIX,
+    minified_method_not_supported_message,
 )
-
 
 torch.backends.cudnn.benchmark = True
 
@@ -116,18 +104,14 @@ class MyModule(VAE, ModuleMetricsMixin):
         qz, z = self.z_encoder(encoder_input, batch_index, *categorical_input)
         ql = None
         if not self.use_observed_lib_size:
-            ql, library_encoded = self.l_encoder(
-                encoder_input, batch_index, *categorical_input
-            )
+            ql, library_encoded = self.l_encoder(encoder_input, batch_index, *categorical_input)
             library = library_encoded
 
         if n_samples > 1:
             untran_z = qz.sample((n_samples,))
             z = self.z_encoder.z_transformation(untran_z)
             if self.use_observed_lib_size:
-                library = library.unsqueeze(0).expand(
-                    (n_samples, library.size(0), library.size(1))
-                )
+                library = library.unsqueeze(0).expand((n_samples, library.size(0), library.size(1)))
             else:
                 library = ql.sample((n_samples,))
         outputs = {"z": z, "qz": qz, "ql": ql, "library": library}
@@ -136,12 +120,8 @@ class MyModule(VAE, ModuleMetricsMixin):
     @torch.inference_mode()
     @auto_move_data
     def inference_counteractive_minibatch(self, counteractive_minibatch_tensors):
-        counteractive_inference_inputs = self._get_inference_input(
-            counteractive_minibatch_tensors
-        )
-        counteractive_inference_outputs = self.inference(
-            **counteractive_inference_inputs
-        )
+        counteractive_inference_inputs = self._get_inference_input(counteractive_minibatch_tensors)
+        counteractive_inference_outputs = self.inference(**counteractive_inference_inputs)
         return counteractive_inference_outputs
 
     def loss(
@@ -152,9 +132,7 @@ class MyModule(VAE, ModuleMetricsMixin):
         kl_weight: float = 1.0,
     ):
         x = tensors[REGISTRY_KEYS.X_KEY]
-        kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(
-            dim=-1
-        )
+        kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(dim=-1)
         if not self.use_observed_lib_size:
             kl_divergence_l = kl(
                 inference_outputs["ql"],
@@ -176,18 +154,10 @@ class MyModule(VAE, ModuleMetricsMixin):
 
         for disentanglement in DisentanglementTargetManager.disentanglements:
             obs_key = disentanglement.obs_key
-            positive_inputs = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][
-                obs_key
-            ][POSITIVE_EXAMPLE_KEY]
-            negative_inputs = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][
-                obs_key
-            ][NEGATIVE_EXAMPLE_KEY]
-            inference_counteractive_positive = self.inference_counteractive_minibatch(
-                positive_inputs
-            )
-            inference_counteractive_negative = self.inference_counteractive_minibatch(
-                negative_inputs
-            )
+            positive_inputs = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][obs_key][POSITIVE_EXAMPLE_KEY]
+            negative_inputs = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][obs_key][NEGATIVE_EXAMPLE_KEY]
+            inference_counteractive_positive = self.inference_counteractive_minibatch(positive_inputs)
+            inference_counteractive_negative = self.inference_counteractive_minibatch(negative_inputs)
 
             cur_weighted_loss, cur_loss = disentanglement.get_total_loss(
                 tensors,
@@ -202,50 +172,34 @@ class MyModule(VAE, ModuleMetricsMixin):
             auxillary_losses.update(cur_loss)
 
         if len(auxillary_losses) > 0:
-            total_weighted_auxillary_losses = torch.sum(
-                torch.stack(list(auxillary_losses.values())), dim=0
-            )
-            total_auxillary_losses = torch.sum(
-                torch.stack(list(auxillary_losses.values())), dim=0
-            )
+            total_weighted_auxillary_losses = torch.sum(torch.stack(list(auxillary_losses.values())), dim=0)
+            total_auxillary_losses = torch.sum(torch.stack(list(auxillary_losses.values())), dim=0)
         else:
-            weighted_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(
-                reconst_loss.device
-            )
-            total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(
-                reconst_loss.device
-            )
+            weighted_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(reconst_loss.device)
+            total_auxillary_losses = torch.zeros(reconst_loss.shape[0]).to(reconst_loss.device)
 
-        report_auxillary_losses = {
-            k: torch.mean(v) for k, v in auxillary_losses.items()
-        }
-        report_auxillary_losses[AUXILLARY_LOSS_MEAN] = torch.mean(
-            total_auxillary_losses
-        )
+        report_auxillary_losses = {k: torch.mean(v) for k, v in auxillary_losses.items()}
+        report_auxillary_losses[AUXILLARY_LOSS_MEAN] = torch.mean(total_auxillary_losses)
 
         # Also report weighted losses. Note that this is not used in progress bar etc, as like `kl_local`.
         report_auxillary_losses.update(
             {
-                LOSS_NAMING_DELIMITER.join([i, WEIGHTED_LOSS_SUFFIX]): torch.mean(
-                    weighted_auxillary_losses[i]
-                )
+                LOSS_NAMING_DELIMITER.join([i, WEIGHTED_LOSS_SUFFIX]): torch.mean(weighted_auxillary_losses[i])
                 for i in weighted_auxillary_losses
             }
         )
 
-        report_auxillary_losses[
-            LOSS_NAMING_DELIMITER.join([AUXILLARY_LOSS_MEAN, WEIGHTED_LOSS_SUFFIX])
-        ] = torch.mean(total_weighted_auxillary_losses)
+        report_auxillary_losses[LOSS_NAMING_DELIMITER.join([AUXILLARY_LOSS_MEAN, WEIGHTED_LOSS_SUFFIX])] = torch.mean(
+            total_weighted_auxillary_losses
+        )
         # Also report kl after weighting
-        report_auxillary_losses[
-            LOSS_NAMING_DELIMITER.join(["kl_local", WEIGHTED_LOSS_SUFFIX])
-        ] = torch.mean(weighted_kl_local)
+        report_auxillary_losses[LOSS_NAMING_DELIMITER.join(["kl_local", WEIGHTED_LOSS_SUFFIX])] = torch.mean(
+            weighted_kl_local
+        )
 
         # Add to the total loss, or do not add for debugging etc purposes
         if self.include_auxillary_loss:
-            loss = torch.mean(
-                reconst_loss + weighted_kl_local + total_weighted_auxillary_losses
-            )
+            loss = torch.mean(reconst_loss + weighted_kl_local + total_weighted_auxillary_losses)
         else:
             warnings.warn(
                 message="Auxillary loss is not added to the total loss. (include_auxillary_loss=False)",

@@ -10,9 +10,7 @@ from contextlib import contextmanager
 def ignore_predetermined_warnings():
     with warnings.catch_warnings():
         # scvi
-        warnings.filterwarnings(
-            "ignore", ".*jax.tree_util.register_keypaths is deprecated.*"
-        )
+        warnings.filterwarnings("ignore", ".*jax.tree_util.register_keypaths is deprecated.*")
         warnings.filterwarnings(
             "ignore",
             ".*Since v1.0.0, scvi-tools no longer uses a random seed by default.*",
@@ -23,9 +21,7 @@ def ignore_predetermined_warnings():
         )
 
         # sparse
-        warnings.filterwarnings(
-            "ignore", ".*SparseDataset is deprecated and will be removed in late 2024.*"
-        )
+        warnings.filterwarnings("ignore", ".*SparseDataset is deprecated and will be removed in late 2024.*")
 
         # umap
         warnings.filterwarnings(
@@ -56,9 +52,7 @@ def ignore_predetermined_warnings():
             "ignore",
             r".*lr scheduler dict contains the key\(s\) \['monitor'\], but the keys will be.*",
         )
-        warnings.filterwarnings(
-            "ignore", ".*`use_gpu` is deprecated in v1.0 and will be removed in v1.1.*"
-        )
+        warnings.filterwarnings("ignore", ".*`use_gpu` is deprecated in v1.0 and will be removed in v1.1.*")
 
         # plotting
         warnings.filterwarnings(

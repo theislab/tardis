@@ -20,10 +20,8 @@ from scvi.data.fields import (
 from scvi.dataloaders._ann_dataloader import AnnDataLoader
 from scvi.model._utils import _init_library_size
 from scvi.model.base import ArchesMixin, BaseModelClass, RNASeqMixin, VAEMixin
-from ._cachedpossiblegroupdefinitionindices import (
-    CachedPossibleGroupDefinitionIndices,
-)
 
+from ._cachedpossiblegroupdefinitionindices import CachedPossibleGroupDefinitionIndices
 from ._disentenglementtargetmanager import DisentanglementTargetManager
 from ._metricsmixin import MetricsMixin
 from ._modelplotting import ModelPlotting
@@ -51,7 +49,7 @@ class MyModel(
 
     _module_cls = MyModule
     # Keep the original AnndataLoader for everything else other than training.
-    # This causes to miss the counteractive minibatch generation for other things. 
+    # This causes to miss the counteractive minibatch generation for other things.
     _data_loader_cls = AnnDataLoader
     _disentanglement_manager_cls = DisentanglementTargetManager
 
@@ -59,29 +57,21 @@ class MyModel(
         super().__init__(adata)
 
         if self._module_init_on_train:
-            raise ValueError(
-                "The model currently does not support initialization without data."
-            )
+            raise ValueError("The model currently does not support initialization without data.")
 
         self._module_kwargs = {**kwargs}
         self._model_summary_string = f"{MODEL_NAME} model"
 
         n_cats_per_cov = (
-            self.adata_manager.get_state_registry(
-                REGISTRY_KEYS.CAT_COVS_KEY
-            ).n_cats_per_key
+            self.adata_manager.get_state_registry(REGISTRY_KEYS.CAT_COVS_KEY).n_cats_per_key
             if REGISTRY_KEYS.CAT_COVS_KEY in self.adata_manager.data_registry
             else None
         )
         n_batch = self.summary_stats.n_batch
-        use_size_factor_key = (
-            REGISTRY_KEYS.SIZE_FACTOR_KEY in self.adata_manager.data_registry
-        )
+        use_size_factor_key = REGISTRY_KEYS.SIZE_FACTOR_KEY in self.adata_manager.data_registry
         library_log_means, library_log_vars = None, None
         if not use_size_factor_key:
-            library_log_means, library_log_vars = _init_library_size(
-                self.adata_manager, n_batch
-            )
+            library_log_means, library_log_vars = _init_library_size(self.adata_manager, n_batch)
 
         self.module = self._module_cls(
             n_input=self.summary_stats.n_vars,
@@ -121,47 +111,31 @@ class MyModel(
         if disentanglement_targets_configurations is None:
             disentanglement_targets_configurations = []
 
-        cls._disentanglement_manager_cls.set_disentanglements(
-            disentanglement_targets_configurations
-        )
+        cls._disentanglement_manager_cls.set_disentanglements(disentanglement_targets_configurations)
         obs_keys = cls._disentanglement_manager_cls.get_ordered_disentanglement_keys()
-        disentanglement_targets_setup_anndata_keys = (
-            obs_keys if len(obs_keys) > 0 else None
-        )
+        disentanglement_targets_setup_anndata_keys = obs_keys if len(obs_keys) > 0 else None
 
         anndata_fields = [
             LayerField(REGISTRY_KEYS.X_KEY, layer, is_count_data=True),
             CategoricalObsField(REGISTRY_KEYS.BATCH_KEY, batch_key),
             CategoricalObsField(REGISTRY_KEYS.LABELS_KEY, labels_key),
-            NumericalObsField(
-                REGISTRY_KEYS.SIZE_FACTOR_KEY, size_factor_key, required=False
-            ),
-            CategoricalJointObsField(
-                REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys
-            ),
-            NumericalJointObsField(
-                REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys
-            ),
+            NumericalObsField(REGISTRY_KEYS.SIZE_FACTOR_KEY, size_factor_key, required=False),
+            CategoricalJointObsField(REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys),
+            NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
             CategoricalJointObsField(
                 REGISTRY_KEY_DISENTANGLEMENT_TARGETS,
                 disentanglement_targets_setup_anndata_keys,
             ),
         ]
         adata_minify_type = _get_adata_minify_type(adata)
-        assert (
-            adata_minify_type is None
-        ), f"{MODEL_NAME} model currently does not support minified data."
-        adata_manager = AnnDataManager(
-            fields=anndata_fields, setup_method_args=setup_method_args
-        )
+        assert adata_minify_type is None, f"{MODEL_NAME} model currently does not support minified data."
+        adata_manager = AnnDataManager(fields=anndata_fields, setup_method_args=setup_method_args)
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
 
         cls._disentanglement_manager_cls.set_anndata_manager_state_registry(
             value={
-                registry_key: adata_manager.registry["field_registries"][registry_key][
-                    "state_registry"
-                ]
+                registry_key: adata_manager.registry["field_registries"][registry_key]["state_registry"]
                 for registry_key in adata_manager.registry["field_registries"]
                 if registry_key != REGISTRY_KEYS.X_KEY
             }

@@ -1,13 +1,14 @@
+#!/usr/bin/env python3
+
 import os
 import sys
-import gc
-import warnings
+from pathlib import Path
+
 import anndata as ad
 import scanpy as sc
 import torch
-from pathlib import Path
 
-sys.path.append(str(Path(os.getcwd()).resolve().parents[0]))
+sys.path.append(str(Path(os.getcwd()).resolve().parents[2]))
 
 import tardis
 
@@ -19,9 +20,7 @@ else:
 print(f"CUDA used: {torch.cuda.is_available()}")
 
 
-adata_file_path = os.path.join(
-    tardis.config.io_directories["processed"], "dataset_subset_sex_2.h5ad"
-)
+adata_file_path = os.path.join(tardis.config.io_directories["processed"], "dataset_subset_sex_2.h5ad")
 assert os.path.isfile(adata_file_path), f"File not already exist: `{adata_file_path}`"
 adata = ad.read_h5ad(adata_file_path)
 sc.pp.filter_cells(adata, min_genes=10, inplace=True)
