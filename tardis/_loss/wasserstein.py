@@ -40,7 +40,7 @@ def _wasserstein_loss_with_normal_latent_distribution(
 
     # Just mean to get the total loss for each datapoint.
     # The loss should not be scaled up or down based on number of relevant latents, so not sum but mean.
-    return (mean_diff_sq + trace_term).mean(dim=-1)
+    return (mean_diff_sq + trace_term).mean(dim=1)
 
 
 class WassersteinLoss(TardisLoss):

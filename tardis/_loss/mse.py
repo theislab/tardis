@@ -18,7 +18,7 @@ class MSE(TardisLoss):
     ) -> torch.Tensor:
 
         return F.mse_loss(
-            input=outputs["z"][:, relevant_latent_indices].clone(),
-            target=counteractive_outputs["z"][:, relevant_latent_indices].clone(),
+            input=counteractive_outputs["z"][:, relevant_latent_indices],
+            target=outputs["z"][:, relevant_latent_indices],
             reduction="none",
-        ).mean(dim=-1)
+        ).mean(dim=1)

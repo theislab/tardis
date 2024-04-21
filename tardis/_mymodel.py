@@ -21,15 +21,14 @@ from scvi.dataloaders._ann_dataloader import AnnDataLoader
 from scvi.model._utils import _init_library_size
 from scvi.model.base import ArchesMixin, BaseModelClass, RNASeqMixin, VAEMixin
 
-from ._cachedpossiblegroupdefinitionindices import CachedPossibleGroupDefinitionIndices
-from ._disentenglementtargetmanager import DisentanglementTargetManager
+from ._counteractivegenerator import CachedPossibleGroupDefinitionIndices
+from ._disentenglementmanager import DisentanglementManager
 from ._metricsmixin import MetricsMixin
 from ._modelplotting import ModelPlotting
 from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 from ._mymodule import MyModule
+from ._mymonitors import ProgressBarManager, TrainingEpochLogger, TrainingStepLogger
 from ._mytrainingmixin import MyUnsupervisedTrainingMixin
-from ._progressbarmanager import ProgressBarManager
-from ._trainingsteplogger import TrainingEpochLogger, TrainingStepLogger
 from ._utils.wandb import check_wandb_configurations
 from ._utils.warnings import ignore_predetermined_warnings
 
@@ -51,7 +50,7 @@ class MyModel(
     # Keep the original AnndataLoader for everything else other than training.
     # This causes to miss the counteractive minibatch generation for other things.
     _data_loader_cls = AnnDataLoader
-    _disentanglement_manager_cls = DisentanglementTargetManager
+    _disentanglement_manager_cls = DisentanglementManager
 
     def __init__(self, adata: AnnData, **kwargs):
         super().__init__(adata)

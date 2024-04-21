@@ -6,7 +6,7 @@ from .mae import MAE
 from .mse import MSE
 from .wasserstein import WassersteinLoss
 
-LOSSES = {
+LOSS = {
     "cosine_similarity": CosineSimilarity,
     "wasserstein": WassersteinLoss,
     "jsd": JSD,

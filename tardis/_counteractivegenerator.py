@@ -6,10 +6,21 @@ from typing import Dict
 
 import numpy as np
 import torch
+from scipy.sparse import spmatrix
 from scvi import REGISTRY_KEYS, settings
+from pydantic import BaseModel, StrictStr
 
-from ._disentenglementtargetmanager import DisentanglementTargetManager
-from ._myconstants import REGISTRY_KEY_DISENTANGLEMENT_TARGETS
+from ._disentenglementmanager import DisentanglementManager
+from ._myconstants import NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY, REGISTRY_KEY_DISENTANGLEMENT_TARGETS
+from ._mymonitors import TrainingStepLogger
+
+
+class CounteractiveGeneratorSettings(BaseModel):
+    method: StrictStr
+    # Accepts any dict without specific type checking.
+    method_kwargs: dict
+    # for now only `random` implemented for counteractive_minibatch_method, raise ValueError in method selection.
+    # seed should be in method_kwargs: str or `global_seed` etc
 
 
 class DatapointDefinitionsKeyGenerator:
@@ -114,7 +125,7 @@ class CachedPossibleGroupDefinitionIndices:
                 f"of counteractive minibatch generation.\n{config}"
             )
 
-        ecc = copy.deepcopy(DisentanglementTargetManager.anndata_manager_state_registry[REGISTRY_KEYS.CAT_COVS_KEY])
+        ecc = copy.deepcopy(DisentanglementManager.anndata_manager_state_registry[REGISTRY_KEYS.CAT_COVS_KEY])
         n_ecc = len(ecc["field_keys"]) if "field_keys" in ecc else 0
         cmk = copy.deepcopy(config.method_kwargs["within_categorical_covs"])
         n_cmk = 0 if cmk is None else len(cmk)
@@ -185,15 +196,7 @@ class CachedPossibleGroupDefinitionIndices:
         except KeyError:
             if data_split_identifier not in cls._items:
                 raise ValueError("The `reset` method should be called in the beginning.")
-            obs_key = DisentanglementTargetManager.get_disentanglement(target_obs_key_ind).obs_key
-            warnings.warn(
-                message=(
-                    "Possible group definition indices are calculating "
-                    f"for `{obs_key}` for `{data_split_identifier}` set."
-                ),
-                category=UserWarning,
-                stacklevel=settings.warnings_stacklevel,
-            )
+            obs_key = DisentanglementManager.get_disentanglement(target_obs_key_ind).obs_key
             cls._initialize_verify_input(dataset_tensors=dataset_tensors)
             cls._initialize_verify_config(config=config)
             cls._initialize(
@@ -211,10 +214,126 @@ class CachedPossibleGroupDefinitionIndices:
             )
             warnings.warn(
                 message=(
-                    f"Number of elements in each group for `{obs_key}` "
-                    f"in `{data_split_identifier}` set: {lengths_to_report}"
+                    f"Possible group definition indices are calculated for `{obs_key}` in `{data_split_identifier}`. "
+                    f"Number of elements in each group: {lengths_to_report}"
                 ),
                 category=UserWarning,
                 stacklevel=settings.warnings_stacklevel,
             )
             return cls._items[data_split_identifier][target_obs_key_ind]
+
+
+class CounteractiveGenerator:
+
+    _cached_group_definition_possible_indices_dict: dict = dict()
+
+    @classmethod
+    def main(cls, target_obs_key_ind: int, **kwargs):
+        """
+        Generates a counteractive minibatch based on the specified method.
+
+        Parameters:
+        - method: Name of the method to use for generating the minibatch.
+        - **kwargs: Keyword arguments passed to the method, including method-specific kwargs and common parameters.
+        """
+        method = DisentanglementManager.get_disentanglement(
+            target_obs_key_ind
+        ).counteractive_generator_settings.method
+        if (
+            not hasattr(CounteractiveGenerator, method)
+            or method == "main"
+            or not callable(getattr(cls, method))
+        ):
+            raise AttributeError(f"{cls.__name__} does not have a callable attribute '{method}'.")
+        else:
+            class_function = getattr(cls, method)
+            return class_function(target_obs_key_ind=target_obs_key_ind, **kwargs)
+
+    @staticmethod
+    def configuration_random_seed(config_seed):
+        if isinstance(config_seed, int):
+            return config_seed
+        else:
+            return getattr(TrainingStepLogger, config_seed)
+
+    @classmethod
+    def categorical_random(
+        cls,
+        target_obs_key_ind: int,
+        minibatch_tensors: dict[str, torch.Tensor],
+        dataset_tensors: dict[str, np.ndarray | spmatrix],
+        splitter_index: np.ndarray,
+        data_split_identifier: str,
+        minibatch_relative_index: list[int],
+    ) -> Dict[str, list[int]]:
+
+        config = DisentanglementManager.disentanglements[target_obs_key_ind].counteractive_generator_settings
+        possible_indices = CachedPossibleGroupDefinitionIndices.get(
+            dataset_tensors,
+            target_obs_key_ind,
+            data_split_identifier,
+            splitter_index,
+            config,
+        )
+        minibatch_definitions = (
+            DatapointDefinitionsKeyGenerator.create_definitions(minibatch_tensors, target_obs_key_ind, config)
+            .clone()  # prevent misbehavior at below randomization operation. testing needed for method training speed.
+            .numpy()  # as it returns a tensor originally.
+        )
+
+        selection = {
+            POSITIVE_EXAMPLE_KEY: minibatch_definitions.copy(),
+            NEGATIVE_EXAMPLE_KEY: None,
+        }
+
+        rng = np.random.default_rng(  # Seeded RNG for consistency
+            seed=CounteractiveGenerator.configuration_random_seed(config.method_kwargs["seed"])
+        )
+        n_cat = DisentanglementManager.anndata_manager_state_registry["disentanglement_target"]["n_cats_per_key"][
+            target_obs_key_ind
+        ]
+        indice_group_definitions = 0
+        random_ints = rng.integers(0, n_cat, size=minibatch_definitions.shape[0])
+        minibatch_definitions[:, indice_group_definitions] = np.where(
+            random_ints == minibatch_definitions[:, indice_group_definitions],
+            (random_ints + 1) % n_cat,  # if random integer is the same as the original
+            random_ints,  # use random integers
+        )
+        selection[NEGATIVE_EXAMPLE_KEY] = minibatch_definitions
+
+        selected_elements = dict()
+        for selection_key, selection_minibatch_definitions in selection.items():
+            _selected_elements = []
+            for datapoint, datapoint_index in zip(selection_minibatch_definitions, minibatch_relative_index):
+                try:
+                    if selection_key == POSITIVE_EXAMPLE_KEY:
+                        # choose randomly but exclude the datapoint itself.
+                        _selected_element = datapoint_index
+                        overhead_counter = 0
+                        while _selected_element == datapoint_index:
+                            _selected_element = rng.choice(possible_indices[tuple(datapoint)])
+                            overhead_counter += 1
+                            if overhead_counter > 1e4:
+                                # as masking etc is costly, simply raise error after trying generous amount of time
+                                to_report = {i: len(possible_indices[i]) for i in possible_indices}
+                                raise ValueError(
+                                    "The positive example could not be chosen randomly when the anchor itself "
+                                    "is excluded. It is likely that some categories in the cached possible indices "
+                                    f"dictionary contains only one element. The keys of this dict is `{to_report}`."
+                                )
+                        _selected_elements.append(_selected_element)
+                    else:
+                        _selected_elements.append(rng.choice(possible_indices[tuple(datapoint)]))
+                except KeyError as e:
+                    to_report = {i: len(possible_indices[i]) for i in possible_indices}
+                    raise KeyError(
+                        f"The minibatch definition `{tuple(datapoint)}` is not found in possible cached indice "
+                        f"dictionary. The keys of this dict is `{to_report}` (given as key and number of elements "
+                        "within). It happens when the `within` statements are so strict, giving rise to there is no "
+                        "corresponding element with such a configuration in the original dataset.In general, "
+                        "please note that `within_batch` is the most frequent problem as it is actually "
+                        "correlated with many possible metadatas directly."
+                    ) from e
+            selected_elements[selection_key] = _selected_elements
+
+        return selected_elements

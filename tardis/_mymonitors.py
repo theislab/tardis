@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+import copy
+
+from tardis._myconstants import PROGRESS_BAR_METRICS_KEYS, PROGRESS_BAR_METRICS_MODES
+
 
 class TrainingEpochLogger:
     current: int
@@ -53,3 +57,21 @@ class TrainingStepLogger:
         for key in cls.__dict__.keys():
             if not key.startswith("__") and not callable(getattr(cls, key)):
                 print(f"{key} = {getattr(cls, key)}")
+
+
+class ProgressBarManager:
+
+    keys: set[str]
+    modes: set[str]
+
+    @classmethod
+    def reset(cls):
+        cls.keys = copy.deepcopy(PROGRESS_BAR_METRICS_KEYS)
+        cls.modes = copy.deepcopy(PROGRESS_BAR_METRICS_MODES)
+
+    @classmethod
+    def add(cls, metric_name):
+        try:
+            cls.keys.add(metric_name)
+        except NameError as e:
+            raise NameError("The class should be initialized in `setup_anndata` by `reset` method.") from e

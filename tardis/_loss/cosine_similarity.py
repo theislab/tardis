@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from .base import TardisLoss
 
 
-class MAE(TardisLoss):
+class CosineSimilarity(TardisLoss):
 
     def _forward(
         self,
@@ -17,8 +17,8 @@ class MAE(TardisLoss):
         relevant_latent_indices: torch.Tensor,
     ) -> torch.Tensor:
 
-        return F.l1_loss(
-            input=outputs["z"][:, relevant_latent_indices].clone(),
-            target=counteractive_outputs["z"][:, relevant_latent_indices].clone(),
-            reduction="none",
-        ).mean(dim=-1)
+        return F.cosine_similarity(
+            x1=counteractive_outputs["z"][:, relevant_latent_indices],
+            x2=outputs["z"][:, relevant_latent_indices],
+            dim=1,
+        )

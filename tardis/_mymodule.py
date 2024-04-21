@@ -9,7 +9,7 @@ from scvi.module import VAE
 from scvi.module.base import LossOutput, auto_move_data
 from torch.distributions import kl_divergence as kl
 
-from ._disentenglementtargetmanager import DisentanglementTargetManager
+from ._disentenglementmanager import DisentanglementManager
 from ._metricsmixin import ModuleMetricsMixin
 from ._myconstants import (
     AUXILLARY_LOSS_MEAN,
@@ -152,7 +152,7 @@ class MyModule(VAE, ModuleMetricsMixin):
         auxillary_losses = {}
         weighted_auxillary_losses = {}
 
-        for disentanglement in DisentanglementTargetManager.disentanglements:
+        for disentanglement in DisentanglementManager.disentanglements:
             obs_key = disentanglement.obs_key
             positive_inputs = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][obs_key][POSITIVE_EXAMPLE_KEY]
             negative_inputs = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][obs_key][NEGATIVE_EXAMPLE_KEY]

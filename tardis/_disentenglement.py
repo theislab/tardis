@@ -4,33 +4,19 @@ from dataclasses import dataclass
 from typing import List, Union
 
 import numpy as np
-import torch
-from pydantic import BaseModel, StrictStr
 
-from ._losses import Losses, Triplets
+from ._losses import SimpleLosses, TripletLosses
+from ._utils.functions import isnumeric
+from ._counteractivegenerator import CounteractiveGeneratorSettings
 
-
-def isnumeric(s):
-    try:
-        float(s)
-        return True
-    except ValueError:
-        return False
-
-
-class CounteractiveMinibatchSettings(BaseModel):
-    method: StrictStr
-    # Accepts any dict without specific type checking.
-    method_kwargs: dict
-    # for now only `random` implemented for counteractive_minibatch_method, raise ValueError in method selection.
-    # seed should be in method_kwargs: str or `global_seed` etc
 
 
 @dataclass
 class Indices:
-    reserved: torch.Tensor = torch.tensor([], dtype=torch.int)
-    unreserved: torch.Tensor = torch.tensor([], dtype=torch.int)
-    complete: torch.Tensor = torch.tensor([], dtype=torch.int)
+    reserved: List[int] = []
+    unreserved: List[int] = []
+    complete: List[int] = []
+    complete_unreserved: List[int] = []
 
 
 class Disentanglement:
@@ -39,25 +25,21 @@ class Disentanglement:
         self,
         obs_key: str,
         n_reserved_latent: int,
-        counteractive_minibatch_settings: CounteractiveMinibatchSettings,
-        losses: Union[List[dict], dict] = [],
-        triplets: Union[List[dict], dict] = [],
+        counteractive_generator_settings: CounteractiveGeneratorSettings,
+        simple_losses: List[dict] = [],
+        triplet_losses: List[dict] = [],
     ):
         self.obs_key = obs_key
         self.n_reserved_latent = n_reserved_latent
+        self.counteractive_generator_settings = CounteractiveGeneratorSettings(**counteractive_generator_settings)
 
-        self.counteractive_minibatch_settings = CounteractiveMinibatchSettings(**counteractive_minibatch_settings)
-        if isinstance(losses, dict):
-            losses = [losses]
+        self._simple_losses = SimpleLosses(simple_losses, obs_key)    
+        # TODO: enforce only one loss at least!
 
-        self._losses = Losses(losses, obs_key)
-
-        if isinstance(triplets, dict):
-            triplets = [triplets]
-
-        self._triplets = []
-        for triplet in triplets:
-            self._triplets.append(Triplets(triplet, obs_key))
+        # TODO: why like below?
+        self._triplet_losses = []
+        for triplet in triplet_losses:
+            self._triplet_losses.append(TripletLosses(triplet, obs_key))
 
         self._indices = Indices()
         self._category_to_values = []
@@ -74,6 +56,10 @@ class Disentanglement:
     @property
     def complete_indices(self):
         return self._indices.complete
+    
+    @property
+    def complete_unreserved_indices(self):
+        return self._indices.complete_unreserved
 
     @reserved_indices.setter
     def reserved_indices(self, value):
@@ -86,6 +72,10 @@ class Disentanglement:
     @complete_indices.setter
     def complete_indices(self, value):
         self._indices.complete = value
+        
+    @complete_unreserved_indices.setter
+    def complete_unreserved_indices(self, value):
+        self._indices.complete_unreserved = value
 
     def set_mappings(self, mappings):
         is_numeric = all([isnumeric(mapping) for mapping in mappings])
@@ -102,7 +92,7 @@ class Disentanglement:
         counteractive_negative_outputs,
     ):
 
-        weighted_loss, total_loss = self._losses.get_total_loss(
+        weighted_loss, total_loss = self._simple_losses.get_total_loss(
             inputs,
             positive_inputs,
             negative_inputs,
@@ -112,7 +102,8 @@ class Disentanglement:
             self._indices,
             self._pseudo_categories,
         )
-        for triplet_losses in self._triplets:
+        # TODO: didnt understand why not just above
+        for triplet_losses in self._triplet_losses:
             cur_weighted_loss, cur_loss = triplet_losses.get_total_loss(
                 outputs,
                 counteractive_positive_outputs,

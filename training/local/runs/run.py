@@ -10,7 +10,7 @@ import torch
 
 sys.path.append(str(Path(os.getcwd()).resolve().parents[2]))
 
-import tardis
+import tardis  # noqa
 
 local_run = True
 if local_run:

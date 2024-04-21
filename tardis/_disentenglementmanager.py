@@ -2,13 +2,11 @@
 
 from typing import List, Optional
 
-import torch
-
-from ._disentenglementtargetconfigurations import Disentanglement
+from ._disentenglement import Disentanglement
 from ._myconstants import REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 
 
-class DisentanglementTargetManager:
+class DisentanglementManager:
     disentanglements: List[Disentanglement] = None
     anndata_manager_state_registry: dict = {}
     _obs_key_to_index: Optional[dict] = {}
@@ -75,14 +73,14 @@ class DisentanglementTargetManager:
             start = cls.n_total_reserved_latent
             end = start + disentanglement.n_reserved_latent
 
-            disentanglement.reserved_indices = torch.tensor(list(range(start, end)), dtype=torch.int)
-            disentanglement.unreserved_indices = torch.tensor(
-                list(range(0, start)) + list(range(end, n_latent)), dtype=torch.int
-            )
-
-            disentanglement.complete_indices = torch.tensor(list(range(n_latent)), dtype=torch.int)
+            disentanglement.reserved_indices = list(range(start, end))
+            disentanglement.unreserved_indices = list(range(0, start)) + list(range(end, n_latent))
+            disentanglement.complete_indices = list(range(n_latent))
 
             cls.n_total_reserved_latent = end
+        
+        for disentanglement in cls.disentanglements:
+            disentanglement.complete_unreserved_indices = list(range(cls.n_total_reserved_latent, cls.n_latent))
 
         if n_latent - cls.n_total_reserved_latent < 1:
             raise ValueError("Not enough latent space variables to reserve for targets.")

@@ -142,8 +142,8 @@ data/**/*
 # And don't ignore .gitkeep files anywhere
 !**/.gitkeep
 
-# Ignore scripts for Aleyna
-scripts/sync_drive_aleyna.sh
+# Remove debugs
+tardis/__DEBUG*
 
 # Ignore all files in the .vscode directory
 /vscode/*

@@ -1,4 +1,3 @@
-# exclude: "^docs/_logo"
 repos:
   - repo: local
     hooks:
@@ -13,16 +12,19 @@ repos:
         name: isort (python)
         entry: isort
         language: system
+        exclude: '.*\.ipynb$'
       - id: isort
         name: isort (cython)
         types: [cython]
         entry: isort
         language: system
+        exclude: '.*\.ipynb$'
       - id: isort
         name: isort (pyi)
         types: [pyi]
         entry: isort
         language: system
+        exclude: '.*\.ipynb$'
       - id: check-added-large-files
         name: Check for added large files
         entry: check-added-large-files
