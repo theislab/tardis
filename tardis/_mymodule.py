@@ -21,6 +21,7 @@ from scvi.module.base import LossOutput, auto_move_data
 from torch.distributions import kl_divergence as kl
 
 from ._disentenglementtargetmanager import DisentanglementTargetManager
+from ._metricsmixin import ModuleMetricsMixin
 from ._myconstants import (
     AUXILLARY_LOSS_MEAN,
     minified_method_not_supported_message,
@@ -37,7 +38,7 @@ torch.backends.cudnn.benchmark = True
 logger = logging.getLogger(__name__)
 
 
-class MyModule(VAE):
+class MyModule(VAE, ModuleMetricsMixin):
 
     def __init__(self, *args, include_auxillary_loss: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
@@ -167,6 +168,7 @@ class MyModule(VAE):
         kl_local_for_warmup = kl_divergence_z
         kl_local_no_warmup = kl_divergence_l
 
+        # Note that `kl_weight` is determined dynamically depending on `n_epochs_kl_warmup` parameter.
         weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
 
         auxillary_losses = {}
@@ -239,6 +241,7 @@ class MyModule(VAE):
             LOSS_NAMING_DELIMITER.join(["kl_local", WEIGHTED_LOSS_SUFFIX])
         ] = torch.mean(weighted_kl_local)
 
+        # Add to the total loss, or do not add for debugging etc purposes
         if self.include_auxillary_loss:
             loss = torch.mean(
                 reconst_loss + weighted_kl_local + total_weighted_auxillary_losses

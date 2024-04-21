@@ -5,7 +5,7 @@ io_directories:
     relative_to: storage_directory
     path: processed
   figures:
-    relative_to: storage_directory
+    relative_to: training_repository
     path: figures
   models:
     relative_to: storage_directory

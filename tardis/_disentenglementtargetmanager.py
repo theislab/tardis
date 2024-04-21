@@ -6,6 +6,7 @@ from typing import List
 from ._disentenglementtargetconfigurations import Disentanglement
 from ._myconstants import REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 
+import numpy as np
 
 class DisentanglementTargetManager:
     disentanglements: List[Disentanglement] = None

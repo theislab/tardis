@@ -19,7 +19,7 @@ REMOTE_USER="kemal.inecik"
 REMOTE_HOST="hpc-build01"
 REMOTE_PATH="$SERVER_PATH/$PROJECT_NAME"
 
-EXCLUSIONS=("__pycache__" "*.DS_Store" ".idea" ".mypy_cache" "*.ipynb_checkpoints" "*.virtual_documents" ".git" "data" "*server/wandb/*")  # data is local!
+EXCLUSIONS=("__pycache__" "*.DS_Store" ".idea" ".mypy_cache" "*.ipynb_checkpoints" "*.virtual_documents" ".git" "data")  # data is local!
 SYNC_DIRS=("notebooks" "preprocessing" "training/server")
 
 # Define ssh and rsync options

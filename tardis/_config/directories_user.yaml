@@ -1,9 +1,16 @@
 # Config File
 
 absolute_paths:
+  server:
+    home_directory: /home/icb/kemal.inecik
+    storage_directory: /lustre/groups/ml01/workspace/kemal.inecik/tardis_data
+    code_repository: /home/icb/kemal.inecik/work/codes/tardis
+    training_repository: /home/icb/kemal.inecik/work/codes/tardis/training/server
+    wandb_parent_directory: /lustre/groups/ml01/workspace/kemal.inecik
 
   local:
-    home_directory: /Users/aleynakara
-    storage_directory: /Users/aleynakara/Documents/tardis/data
-    code_repository: /Users/aleynakara/Documents/tardis
-    training_repository: /Users/aleynakara/Documents/tardis/training/local
+    home_directory: /Users/kemalinecik
+    storage_directory: /Users/kemalinecik/git_nosync/tardis/data
+    code_repository: /Users/kemalinecik/git_nosync/tardis
+    training_repository: /Users/kemalinecik/git_nosync/tardis/training/local
+    wandb_parent_directory: /Users/kemalinecik

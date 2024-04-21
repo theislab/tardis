@@ -25,6 +25,7 @@ from ._cachedpossiblegroupdefinitionindices import (
 )
 
 from ._disentenglementtargetmanager import DisentanglementTargetManager
+from ._auxillarylosswarmupmanager import AuxillaryLossWarmupManager
 from ._metricsmixin import MetricsMixin
 from ._modelplotting import ModelPlotting
 from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTANGLEMENT_TARGETS
@@ -51,6 +52,7 @@ class MyModel(
 
     _module_cls = MyModule
     # Keep the original AnndataLoader for everything else other than training.
+    # This causes to miss the counteractive minibatch generation for other things. 
     _data_loader_cls = AnnDataLoader
     _disentanglement_manager_cls = DisentanglementTargetManager
 
@@ -115,6 +117,7 @@ class MyModel(
         TrainingEpochLogger.reset()
         ProgressBarManager.reset()
         CachedPossibleGroupDefinitionIndices.reset()
+        AuxillaryLossWarmupManager.reset()
         cls._disentanglement_manager_cls.reset()
 
         if disentanglement_targets_configurations is None:
