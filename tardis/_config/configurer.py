@@ -110,11 +110,7 @@ class Configurer:
         """
         This function checks if a directory is writable.
         """
-        if (
-            not os.path.isdir(abs_path)
-            or not os.access(abs_path, os.W_OK)
-            or not os.path.isabs(abs_path)
-        ):
+        if not os.path.isdir(abs_path) or not os.access(abs_path, os.W_OK) or not os.path.isabs(abs_path):
             error_msg = f"The directory '{v}' for key '{k}' is not a writable absolute directory."
             self.logger.error(error_msg)
             raise ValueError(error_msg)
@@ -135,9 +131,7 @@ class Configurer:
                 self.logger.error(error_msg)
                 raise TypeError(error_msg)
 
-            _ap = self._check_relative_path_yaml_format(
-                key=k, value=v, return_absolute=True
-            )
+            _ap = self._check_relative_path_yaml_format(key=k, value=v, return_absolute=True)
             self._check_writable_absolute_path(_ap, k, v)
             result[k] = _ap
 
@@ -165,23 +159,17 @@ class Configurer:
             available_keys.remove(key)
 
         if len(available_keys) > 0:
-            error_msg = (
-                f"Available remaining keys in W&B configurations': {available_keys}"
-            )
+            error_msg = f"Available remaining keys in W&B configurations': {available_keys}"
             self.logger.error(error_msg)
             raise KeyError(error_msg)
 
-        assert read_yaml["environment_variables"] is None or isinstance(
-            read_yaml["environment_variables"], dict
-        )
+        assert read_yaml["environment_variables"] is None or isinstance(read_yaml["environment_variables"], dict)
         assert isinstance(read_yaml["environment_variables"], dict)
         assert isinstance(read_yaml["login_credentials"], dict)
 
         k = "save_dir"
         v = read_yaml["wandblogger_kwargs"][k]
-        _ap = self._check_relative_path_yaml_format(
-            key=k, value=v, return_absolute=True
-        )
+        _ap = self._check_relative_path_yaml_format(key=k, value=v, return_absolute=True)
         self._check_writable_absolute_path(_ap, k, v)
         read_yaml["wandblogger_kwargs"][k] = _ap
 

@@ -1,7 +1,9 @@
-"TODO: We are calculating cosine similarity not cosine distance. The loss should be 1 - cosine similarity. Fix the test cases accordingly."
+#!/usr/bin/env python3
+
+from typing import Dict
+
 import torch
 import torch.nn.functional as F
-from typing import Dict
 
 from .base import TardisLoss
 

@@ -1,10 +1,10 @@
 # Config File
 
 environment_variables:
-  WANDB_USERNAME: aleynakara98
-  WANDB_USER_EMAIL: aleynakara98@gmail.com
+  WANDB_USERNAME: inecik
+  WANDB_USER_EMAIL: benkemalim@gmail.com
   WANDB_SILENT: "true"
 
 login_credentials:
-  username: aleynakara98
-  email: aleynakara98@gmail.com
+  username: inecik
+  email: benkemalim@gmail.com

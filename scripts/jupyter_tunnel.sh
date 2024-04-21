@@ -33,7 +33,7 @@ source "/Users/kemalinecik/Documents/Helmholtz/password.sh"
 
 REMOTE_USER="kemal.inecik"
 REMOTE_HOST="hpc-build01"
-LOCAL_PORT="10101"
+LOCAL_PORT="10121"
 
 # Build the SSH command
 sshpass_command="sshpass -p '$password_icb'"

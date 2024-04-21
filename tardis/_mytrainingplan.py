@@ -14,9 +14,7 @@ from ._trainingsteplogger import TrainingEpochLogger, TrainingStepLogger
 class MyTrainingPlan(TrainingPlan):
 
     def forward(self, *args, **kwargs):
-        TrainingStepLogger.set_step(
-            key="gglobal", value=copy.deepcopy(self.global_step)
-        )
+        TrainingStepLogger.set_step(key="gglobal", value=copy.deepcopy(self.global_step))
         TrainingEpochLogger.set_epoch(key="current", value=self.current_epoch)
         TrainingStepLogger.increment_step(key="forward")
         return self.module(*args, **kwargs)
@@ -100,11 +98,7 @@ class MyTrainingPlan(TrainingPlan):
         )
         # pytorch lightning handles everything with the torchmetric object
         self.log_dict(
-            {
-                k: v
-                for k, v in metrics.items()
-                if not self.is_key_should_be_in_progress_bar(k, mode)
-            },
+            {k: v for k, v in metrics.items() if not self.is_key_should_be_in_progress_bar(k, mode)},
             on_step=False,
             on_epoch=True,
             prog_bar=False,
@@ -112,11 +106,7 @@ class MyTrainingPlan(TrainingPlan):
             sync_dist=self.use_sync_dist,
         )
         self.log_dict(
-            {
-                k: v
-                for k, v in metrics.items()
-                if self.is_key_should_be_in_progress_bar(k, mode)
-            },
+            {k: v for k, v in metrics.items() if self.is_key_should_be_in_progress_bar(k, mode)},
             on_step=False,
             on_epoch=True,
             prog_bar=True,

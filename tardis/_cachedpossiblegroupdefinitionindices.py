@@ -17,9 +17,7 @@ class DatapointDefinitionsKeyGenerator:
     @classmethod
     def create_definitions(cls, dict_items, target_obs_key_ind, config):
 
-        operation_mode_torch = (
-            True if torch.is_tensor(dict_items[REGISTRY_KEYS.BATCH_KEY]) else False
-        )
+        operation_mode_torch = True if torch.is_tensor(dict_items[REGISTRY_KEYS.BATCH_KEY]) else False
 
         batch_definitions = dict_items[REGISTRY_KEYS.BATCH_KEY]
         if config.method_kwargs["within_batch"]:
@@ -37,33 +35,23 @@ class DatapointDefinitionsKeyGenerator:
             labels_definitions = np.zeros_like(batch_definitions)
 
         if operation_mode_torch:
-            group_definitions = dict_items[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][
-                :, target_obs_key_ind
-            ].view(-1, 1)
+            group_definitions = dict_items[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, target_obs_key_ind].view(-1, 1)
         else:
             group_definitions = (
-                dict_items[REGISTRY_KEY_DISENTANGLEMENT_TARGETS]
-                .iloc[:, target_obs_key_ind]
-                .values.reshape(-1, 1)
+                dict_items[REGISTRY_KEY_DISENTANGLEMENT_TARGETS].iloc[:, target_obs_key_ind].values.reshape(-1, 1)
             )
 
         catcovs_definitions = []
         if REGISTRY_KEYS.CAT_COVS_KEY in dict_items:
             cmk = config.method_kwargs["within_categorical_covs"]
-            for include_cotcov_ind, include_cotcov in enumerate(
-                [] if cmk is None else cmk
-            ):
+            for include_cotcov_ind, include_cotcov in enumerate([] if cmk is None else cmk):
                 if include_cotcov and operation_mode_torch:
                     catcovs_definitions.append(
-                        dict_items[REGISTRY_KEYS.CAT_COVS_KEY][
-                            :, include_cotcov_ind
-                        ].view(-1, 1)
+                        dict_items[REGISTRY_KEYS.CAT_COVS_KEY][:, include_cotcov_ind].view(-1, 1)
                     )
                 elif include_cotcov:
                     catcovs_definitions.append(
-                        dict_items[REGISTRY_KEYS.CAT_COVS_KEY]
-                        .iloc[:, include_cotcov_ind]
-                        .values.reshape(-1, 1)
+                        dict_items[REGISTRY_KEYS.CAT_COVS_KEY].iloc[:, include_cotcov_ind].values.reshape(-1, 1)
                     )
                 elif operation_mode_torch:
                     catcovs_definitions.append(torch.zeros_like(batch_definitions))
@@ -99,15 +87,11 @@ class CachedPossibleGroupDefinitionIndices:
             warning_keys=[REGISTRY_KEYS.CONT_COVS_KEY, REGISTRY_KEYS.SIZE_FACTOR_KEY],
         )
         possible_keys = {j for i in known_keys for j in known_keys[i]}
-        possible_keys.add(
-            REGISTRY_KEYS.CAT_COVS_KEY
-        )  # will be used if provided but not must-have or warning-raising.
+        possible_keys.add(REGISTRY_KEYS.CAT_COVS_KEY)  # will be used if provided but not must-have or warning-raising.
 
         for must_have_key in known_keys["must_have_keys"]:
             if must_have_key not in dataset_tensors_keys:
-                raise ValueError(
-                    f"Registry `{must_have_key}` not found in `tensors`: {dataset_tensors.keys()}"
-                )
+                raise ValueError(f"Registry `{must_have_key}` not found in `tensors`: {dataset_tensors.keys()}")
 
         for warning_key in known_keys["warning_keys"]:
             if warning_key in dataset_tensors_keys:
@@ -130,11 +114,7 @@ class CachedPossibleGroupDefinitionIndices:
                 f"of counteractive minibatch generation.\n{config}"
             )
 
-        ecc = copy.deepcopy(
-            DisentanglementTargetManager.anndata_manager_state_registry[
-                REGISTRY_KEYS.CAT_COVS_KEY
-            ]
-        )
+        ecc = copy.deepcopy(DisentanglementTargetManager.anndata_manager_state_registry[REGISTRY_KEYS.CAT_COVS_KEY])
         n_ecc = len(ecc["field_keys"]) if "field_keys" in ecc else 0
         cmk = copy.deepcopy(config.method_kwargs["within_categorical_covs"])
         n_cmk = 0 if cmk is None else len(cmk)
@@ -159,9 +139,7 @@ class CachedPossibleGroupDefinitionIndices:
             target_obs_key_ind=target_obs_key_ind,
             config=config,
         )
-        unique_definitions, inverse_indices = np.unique(
-            definitions, axis=0, return_inverse=True
-        )
+        unique_definitions, inverse_indices = np.unique(definitions, axis=0, return_inverse=True)
 
         obs_key_items = {tuple(map(float, row)): [] for row in unique_definitions}
         for idx, inverse_idx in enumerate(inverse_indices):
@@ -175,10 +153,7 @@ class CachedPossibleGroupDefinitionIndices:
         for unique_definition_tuple in obs_key_items:
             # return the index, relative to the splitter index, but not relative to the dataset
             obs_key_items[unique_definition_tuple] = np.array(
-                [
-                    np.where(splitter_index == a)[0][0]
-                    for a in obs_key_items[unique_definition_tuple]
-                ]
+                [np.where(splitter_index == a)[0][0] for a in obs_key_items[unique_definition_tuple]]
             )
 
         cls._items[data_split_identifier][target_obs_key_ind] = obs_key_items
@@ -209,12 +184,8 @@ class CachedPossibleGroupDefinitionIndices:
             return cls._items[data_split_identifier][target_obs_key_ind]
         except KeyError:
             if data_split_identifier not in cls._items:
-                raise ValueError(
-                    "The `reset` method should be called in the beginning."
-                )
-            obs_key = DisentanglementTargetManager.get_disentanglement(
-                target_obs_key_ind
-            ).obs_key
+                raise ValueError("The `reset` method should be called in the beginning.")
+            obs_key = DisentanglementTargetManager.get_disentanglement(target_obs_key_ind).obs_key
             warnings.warn(
                 message=(
                     "Possible group definition indices are calculating "
@@ -235,9 +206,7 @@ class CachedPossibleGroupDefinitionIndices:
             lengths_to_report = ",".join(
                 [
                     str(len(cls._items[data_split_identifier][target_obs_key_ind][c]))
-                    for c in cls._items[data_split_identifier][
-                        target_obs_key_ind
-                    ].keys()
+                    for c in cls._items[data_split_identifier][target_obs_key_ind].keys()
                 ]
             )
             warnings.warn(

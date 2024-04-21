@@ -31,9 +31,7 @@ class ModelPlotting:
             return df[(df.index >= n)]
 
         if not (
-            isinstance(metrics_name, list)
-            and len(metrics_name) > 0
-            and all([isinstance(i, str) for i in metrics_name])
+            isinstance(metrics_name, list) and len(metrics_name) > 0 and all([isinstance(i, str) for i in metrics_name])
         ):
             raise ValueError
 
@@ -47,10 +45,7 @@ class ModelPlotting:
         ):
             raise ValueError
 
-        params = [
-            (f"{i}_train", f"{i}_validation", j)
-            for i, j in zip(metrics_name, metrics_title)
-        ]
+        params = [(f"{i}_train", f"{i}_validation", j) for i, j in zip(metrics_name, metrics_title)]
         if extra_triplets is not None:
             if not isinstance(extra_triplets, list) or not all(
                 [isinstance(i, tuple) and len(i) == 3 for i in extra_triplets]
@@ -67,14 +62,8 @@ class ModelPlotting:
                 stacklevel=settings.warnings_stacklevel,
             )
 
-        sanity_check = [
-            j[i] for j in params for i in range(2) if j[i] not in self.history
-        ]
-        sanity_check = [
-            sc
-            for sc in sanity_check
-            if not (sc.endswith("_validation") and validatation_calculated)
-        ]
+        sanity_check = [j[i] for j in params for i in range(2) if j[i] not in self.history]
+        sanity_check = [sc for sc in sanity_check if not (sc.endswith("_validation") and validatation_calculated)]
         if len(sanity_check) != 0:
             ValueError(f"Following metrics are not in model.history `{sanity_check}`.")
 
@@ -124,9 +113,7 @@ class ModelPlotting:
         lightness_max = 0.8  # Avoid near-white colors
 
         # Calculate the step to evenly distribute the gray tones within the range
-        step = (lightness_max - lightness_min) / max(
-            1, num_variable - 1
-        )  # Avoid division by zero
+        step = (lightness_max - lightness_min) / max(1, num_variable - 1)  # Avoid division by zero
 
         # Generate the gray tones with alpha values
         gray_tones_with_alpha = [
@@ -158,9 +145,7 @@ class ModelPlotting:
                 adata_obs[target_obs_key].values.reshape(-1, 1),
                 axis=1,
             )
-            columns = [f"Latent {i}" for i in range(self.module.n_latent)] + [
-                target_obs_key
-            ]
+            columns = [f"Latent {i}" for i in range(self.module.n_latent)] + [target_obs_key]
         else:
             latent_representations_with_metadata = latent_representation
             columns = [f"Latent {i}" for i in range(self.module.n_latent)]
@@ -178,9 +163,7 @@ class ModelPlotting:
         if latent_dim_of_interest is not None:
 
             with ignore_predetermined_warnings():
-                plt.figure(
-                    figsize=(individual_plot_size * 1.5, individual_plot_size * 1.5)
-                )
+                plt.figure(figsize=(individual_plot_size * 1.5, individual_plot_size * 1.5))
                 sns.kdeplot(
                     df,
                     x=f"Latent {latent_dim_of_interest}",

@@ -1,16 +1,19 @@
-import torch
-import numpy as np
+#!/usr/bin/env python3
+
 from collections import defaultdict
 
+import torch
+from scvi import REGISTRY_KEYS
 
-from .losses import LOSSES
-from ._myconstants import LOSS_NAMING_DELIMITER
-from ._myconstants import LOSS_NAMING_PREFIX
-from ._myconstants import LATENT_INDEX_GROUP_NAMES
+from ._myconstants import (
+    LATENT_INDEX_GROUP_NAMES,
+    LOSS_NAMING_DELIMITER,
+    LOSS_NAMING_PREFIX,
+    REGISTRY_KEY_DISENTANGLEMENT_TARGETS,
+)
 from ._progressbarmanager import ProgressBarManager
 from ._trainingsteplogger import TrainingEpochLogger
-from scvi import REGISTRY_KEYS
-from ._myconstants import REGISTRY_KEY_DISENTANGLEMENT_TARGETS
+from .losses import LOSSES
 
 
 def isnumeric(s):
@@ -94,9 +97,7 @@ class LossesBase:
         if not isinstance(latent_group, str):
             raise ValueError("loss_config['type'] should be a string.")
         if latent_group not in set(LATENT_INDEX_GROUP_NAMES):
-            raise ValueError(
-                f"loss_config['type'] should be one of {LATENT_INDEX_GROUP_NAMES}"
-            )
+            raise ValueError(f"loss_config['type'] should be one of {LATENT_INDEX_GROUP_NAMES}")
 
         return dict(
             method=method,
@@ -119,32 +120,20 @@ class LossesBase:
         else:
             return (epoch - start) / (end + 1 - start)
 
-    def get_inputs(
-        self, inputs, positive_inputs, negative_inputs, target_type, pseudo_categories
-    ):
+    def get_inputs(self, inputs, positive_inputs, negative_inputs, target_type, pseudo_categories):
 
         device = inputs[REGISTRY_KEYS.X_KEY].device
 
         if target_type == "pseudo_categorical":
 
-            _inputs = (
-                inputs[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, self.index]
-                .detach()
-                .cpu()
-                .numpy()
-            )
+            _inputs = inputs[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, self.index].detach().cpu().numpy()
             _positive_inputs = None
             _negative_inputs = (
-                negative_inputs[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, self.index]
-                .detach()
-                .cpu()
-                .numpy()
+                negative_inputs[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, self.index].detach().cpu().numpy()
             )
 
             _inputs = torch.tensor(pseudo_categories(_inputs), device=device)
-            _negative_inputs = torch.tensor(
-                pseudo_categories(_negative_inputs), device=device
-            )
+            _negative_inputs = torch.tensor(pseudo_categories(_negative_inputs), device=device)
         else:
             _inputs = inputs[REGISTRY_KEYS.X_KEY]
             _positive_inputs = positive_inputs[REGISTRY_KEYS.X_KEY]
@@ -199,9 +188,7 @@ class LossesBase:
                 warmup_weight = self.get_warmup_weight(warmup_period)
                 loss = loss_fn.forward(outputs, counteractive_outputs, relavant_indices)
                 total_loss[index][identifier] = coefficients * loss
-                weighted_total_loss[index][identifier] = (
-                    total_loss[index][identifier] * warmup_weight
-                )
+                weighted_total_loss[index][identifier] = total_loss[index][identifier] * warmup_weight
         return weighted_total_loss, total_loss
 
 
@@ -267,21 +254,14 @@ class Triplets(LossesBase):
         positive = torch.mean(torch.cat([v for v in positive_losses.values()]))
         negative = torch.mean(torch.cat([v for v in negative_losses.values()]))
 
-        weighted_positive = torch.mean(
-            torch.cat([v for v in weighted_positive_losses.values()])
-        )
-        weighted_negative = torch.mean(
-            torch.cat([v for v in weighted_negative_losses.values()])
-        )
+        weighted_positive = torch.mean(torch.cat([v for v in weighted_positive_losses.values()]))
+        weighted_negative = torch.mean(torch.cat([v for v in weighted_negative_losses.values()]))
 
         loss = torch.max(positive - negative, torch.zeros_like(positive))
-        weighted_loss = torch.max(
-            weighted_positive - weighted_negative, torch.zeros_like(weighted_positive)
-        )
+        weighted_loss = torch.max(weighted_positive - weighted_negative, torch.zeros_like(weighted_positive))
 
         concatenated_keys = [
-            k.split(LOSS_NAMING_DELIMITER)[-1]
-            for k in set(positive_losses.keys()).union(negative_losses.keys())
+            k.split(LOSS_NAMING_DELIMITER)[-1] for k in set(positive_losses.keys()).union(negative_losses.keys())
         ].join(LOSS_NAMING_DELIMITER)
 
         identifier = LOSS_NAMING_DELIMITER.join(

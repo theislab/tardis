@@ -1,5 +1,8 @@
-import torch
+#!/usr/bin/env python3
+
 from typing import Dict, Optional
+
+import torch
 
 from .base import TardisLoss
 
@@ -33,11 +36,7 @@ def _wasserstein_loss_with_normal_latent_distribution(
     # The squared difference of means, element-wise.
     mean_diff_sq = (loc_inference - loc_counteractive).pow(2)
     # For diagonal covariances, the trace term simplifies to an element-wise operation.
-    trace_term = (
-        scale_inference_squared
-        + scale_counteractive_squared
-        - 2 * (scale_inference * scale_counteractive)
-    )
+    trace_term = scale_inference_squared + scale_counteractive_squared - 2 * (scale_inference * scale_counteractive)
 
     # Just mean to get the total loss for each datapoint.
     # The loss should not be scaled up or down based on number of relevant latents, so not sum but mean.
@@ -54,7 +53,7 @@ class WassersteinLoss(TardisLoss):
         target_type: str = "categorical",
         method_kwargs: Dict[str, any] = {},
     ) -> None:
-        super(WassersteinLoss, self).__init__(
+        super().__init__(
             weight=weight,
             is_minimized=is_minimized,
             transformation=transformation,

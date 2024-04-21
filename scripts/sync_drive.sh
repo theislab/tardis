@@ -5,9 +5,9 @@ set -e
 
 # Define paths
 SERVER_DATA_PATH="/lustre/groups/ml01/workspace/kemal.inecik/tardis_data"
-LOCAL_DATA_PATH="/Users/aleynakara/Documents/tardis/data"
+LOCAL_DATA_PATH="/Users/kemalinecik/git_nosync/tardis/data"
 DRIVE_DATA_PATH="gdrive:/tardis/tardis_data"
-REPO_PATH="/Users/aleynakara/Documents/tardis"
+REPO_PATH="/Users/kemalinecik/git_nosync/tardis"
 DRIVE_REPO_PATH="gdrive:/tardis/repo"
 
 # Define common exclude parameters as an array
@@ -34,15 +34,15 @@ while true; do
 
     # Execute the corresponding command based on the user's choice
     case $choice in
-        1) rclone sync -v --progress -L "$SERVER_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}" --drive-shared-with-me
+        1) rclone sync -v --progress -L "$SERVER_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}"
            ;;
-        2) rclone sync -v --progress "$LOCAL_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}" --drive-shared-with-me
+        2) rclone sync -v --progress "$LOCAL_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}"
            ;;
-        3) rclone sync -v --progress "$DRIVE_DATA_PATH" "$LOCAL_DATA_PATH" "${COMMON_EXCLUDES[@]}" --drive-shared-with-me
+        3) rclone sync -v --progress "$DRIVE_DATA_PATH" "$LOCAL_DATA_PATH" "${COMMON_EXCLUDES[@]}"
            ;;
-        4) rclone sync -v --progress "$DRIVE_DATA_PATH" "$SERVER_DATA_PATH" "${COMMON_EXCLUDES[@]}" --drive-shared-with-me
+        4) rclone sync -v --progress "$DRIVE_DATA_PATH" "$SERVER_DATA_PATH" "${COMMON_EXCLUDES[@]}"
            ;;
-        5) rclone sync -v --progress "$REPO_PATH" "$DRIVE_REPO_PATH" "${COMMON_EXCLUDES[@]}" --drive-shared-with-me \
+        5) rclone sync -v --progress "$REPO_PATH" "$DRIVE_REPO_PATH" "${COMMON_EXCLUDES[@]}" \
             --exclude '/data/**'
            ;;
         q) echo "Exiting script."

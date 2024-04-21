@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 
-from ._utils.preprocessing import (
-    NA_CELL_TYPE_PLACEHOLDER,
-    RANK_GENES_GROUPS_KEY,
-)  # noqa
+from ._utils.preprocessing import NA_CELL_TYPE_PLACEHOLDER, RANK_GENES_GROUPS_KEY  # noqa
 
 MODEL_NAME = "tardis"
 REGISTRY_KEY_DISENTANGLEMENT_TARGETS = "disentanglement_target"
 REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS = "disentanglement_target_tensors"
 
-minified_method_not_supported_message = (
-    f"{MODEL_NAME} model currently does not support minified data."
-)
+minified_method_not_supported_message = f"{MODEL_NAME} model currently does not support minified data."
 
 LOSS_NAMING_DELIMITER = "_"
 LOSS_NAMING_PREFIX = "tardis"

@@ -1,6 +1,10 @@
+#!/usr/bin/env python3
+
+from typing import Dict
+
 import torch
 import torch.nn.functional as F
-from typing import Dict
+
 from .base import TardisLoss
 
 

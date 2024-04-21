@@ -20,6 +20,4 @@ class ProgressBarManager:
         try:
             cls.keys.add(metric_name)
         except NameError as e:
-            raise NameError(
-                "The class should be initialized in `setup_anndata` by `reset` method."
-            ) from e
+            raise NameError("The class should be initialized in `setup_anndata` by `reset` method.") from e

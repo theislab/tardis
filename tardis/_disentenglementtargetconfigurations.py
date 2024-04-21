@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-import numpy as np
-import torch
 
 from dataclasses import dataclass
 from typing import List, Union
 
-from pydantic import (
-    BaseModel,
-    StrictStr,
-)
+import numpy as np
+import torch
+from pydantic import BaseModel, StrictStr
 
 from ._losses import Losses, Triplets
 
@@ -49,9 +46,7 @@ class Disentanglement:
         self.obs_key = obs_key
         self.n_reserved_latent = n_reserved_latent
 
-        self.counteractive_minibatch_settings = CounteractiveMinibatchSettings(
-            **counteractive_minibatch_settings
-        )
+        self.counteractive_minibatch_settings = CounteractiveMinibatchSettings(**counteractive_minibatch_settings)
         if isinstance(losses, dict):
             losses = [losses]
 
