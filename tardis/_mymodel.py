@@ -25,7 +25,6 @@ from ._cachedpossiblegroupdefinitionindices import (
 )
 
 from ._disentenglementtargetmanager import DisentanglementTargetManager
-from ._auxillarylosswarmupmanager import AuxillaryLossWarmupManager
 from ._metricsmixin import MetricsMixin
 from ._modelplotting import ModelPlotting
 from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTANGLEMENT_TARGETS
@@ -117,7 +116,6 @@ class MyModel(
         TrainingEpochLogger.reset()
         ProgressBarManager.reset()
         CachedPossibleGroupDefinitionIndices.reset()
-        AuxillaryLossWarmupManager.reset()
         cls._disentanglement_manager_cls.reset()
 
         if disentanglement_targets_configurations is None:
