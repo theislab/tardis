@@ -75,11 +75,7 @@ class ModelPlotting:
             params_iter = iter(params)
             n_params = len(params)
             n_ceil = math.ceil(n_params / n_col)
-            fig, axs = plt.subplots(
-                nrows=n_ceil,
-                ncols=n_col,
-                figsize=(unit_size * 1 * n_col, n_ceil * unit_size),
-            )
+            fig, axs = plt.subplots(nrows=n_ceil, ncols=n_col, figsize=(unit_size * 1 * n_col, n_ceil * unit_size))
             for i in range(n_ceil):
                 for j in range(n_col):
                     ax = axs[i, j] if n_ceil != 1 else axs[j]
@@ -92,15 +88,7 @@ class ModelPlotting:
                     if validatation_calculated:
                         ax.plot(_ignore_first(valid_data, ignore_first), **valid_kwargs)
                         ax.legend(fontsize=8)
-                    sns.despine(
-                        ax=ax,
-                        top=True,
-                        right=True,
-                        left=False,
-                        bottom=False,
-                        offset=None,
-                        trim=False,
-                    )
+                    sns.despine(ax=ax, top=True, right=True, left=False, bottom=False, offset=None, trim=False)
                     ax.set_title(title_str, fontsize=10)
 
             plt.tight_layout()
@@ -118,13 +106,7 @@ class ModelPlotting:
         # Generate the gray tones with alpha values
         gray_tones_with_alpha = [
             mcolors.to_hex(
-                (
-                    lightness_min + i * step,
-                    lightness_min + i * step,
-                    lightness_min + i * step,
-                    alpha,
-                ),
-                keep_alpha=True,
+                (lightness_min + i * step, lightness_min + i * step, lightness_min + i * step, alpha), keep_alpha=True
             )
             for i in range(num_variable)
         ]
@@ -141,9 +123,7 @@ class ModelPlotting:
 
         if target_obs_key is not None:
             latent_representations_with_metadata = np.append(
-                latent_representation,
-                adata_obs[target_obs_key].values.reshape(-1, 1),
-                axis=1,
+                latent_representation, adata_obs[target_obs_key].values.reshape(-1, 1), axis=1
             )
             columns = [f"Latent {i}" for i in range(self.module.n_latent)] + [target_obs_key]
         else:
@@ -164,13 +144,7 @@ class ModelPlotting:
 
             with ignore_predetermined_warnings():
                 plt.figure(figsize=(individual_plot_size * 1.5, individual_plot_size * 1.5))
-                sns.kdeplot(
-                    df,
-                    x=f"Latent {latent_dim_of_interest}",
-                    hue=target_obs_key,
-                    fill=True,
-                    **kwargs,
-                )
+                sns.kdeplot(df, x=f"Latent {latent_dim_of_interest}", hue=target_obs_key, fill=True, **kwargs)
                 sns.despine(top=True, right=True, left=False, bottom=False)
                 if target_obs_key is not None:
                     plt.legend(loc="upper right")
@@ -182,11 +156,7 @@ class ModelPlotting:
             cols = math.ceil(total_plots**0.5)
             rows = math.ceil(total_plots / cols)
 
-            fig, axs = plt.subplots(
-                rows,
-                cols,
-                figsize=(cols * individual_plot_size, rows * individual_plot_size),
-            )
+            fig, axs = plt.subplots(rows, cols, figsize=(cols * individual_plot_size, rows * individual_plot_size))
 
             # Iterate over all latent dimensions to create individual plots
             for i in range(self.module.n_latent):
@@ -202,13 +172,7 @@ class ModelPlotting:
                 plot_legend = (row == 0) and (col == cols - 1 if cols > 1 else 0)
 
                 g = sns.kdeplot(
-                    data=df,
-                    x=f"Latent {i}",
-                    hue=target_obs_key,
-                    fill=True,
-                    ax=ax,
-                    legend=plot_legend,
-                    **kwargs,
+                    data=df, x=f"Latent {i}", hue=target_obs_key, fill=True, ax=ax, legend=plot_legend, **kwargs
                 )
                 if plot_legend and target_obs_key is not None:
                     sns.move_legend(g, "upper right")

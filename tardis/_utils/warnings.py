@@ -11,46 +11,26 @@ def ignore_predetermined_warnings():
     with warnings.catch_warnings():
         # scvi
         warnings.filterwarnings("ignore", ".*jax.tree_util.register_keypaths is deprecated.*")
-        warnings.filterwarnings(
-            "ignore",
-            ".*Since v1.0.0, scvi-tools no longer uses a random seed by default.*",
-        )
-        warnings.filterwarnings(
-            "ignore",
-            ".*Setting `dl_pin_memory_gpu_training` is deprecated in v1.0 and.*",
-        )
+        warnings.filterwarnings("ignore", ".*Since v1.0.0, scvi-tools no longer uses a random seed by default.*")
+        warnings.filterwarnings("ignore", ".*Setting `dl_pin_memory_gpu_training` is deprecated in v1.0 and.*")
 
         # sparse
         warnings.filterwarnings("ignore", ".*SparseDataset is deprecated and will be removed in late 2024.*")
 
         # umap
-        warnings.filterwarnings(
-            "ignore",
-            ".*The 'nopython' keyword argument was not supplied to the 'numba.jit'.*",
-        )
+        warnings.filterwarnings("ignore", ".*The 'nopython' keyword argument was not supplied to the 'numba.jit'.*")
 
         # scanpy
         warnings.filterwarnings(
-            "ignore",
-            ".*No data for colormapping provided via 'c'. Parameters 'cmap' will be ignored.*",
+            "ignore", ".*No data for colormapping provided via 'c'. Parameters 'cmap' will be ignored.*"
         )
 
         # vae.train
+        warnings.filterwarnings("ignore", ".*The `srun` command is available on your system but is not used.*")
+        warnings.filterwarnings("ignore", ".*The value argument must be within the support of the distribution.*")
+        warnings.filterwarnings("ignore", ".*MPS available but not used. Set `accelerator` and `devices` using.*")
         warnings.filterwarnings(
-            "ignore",
-            ".*The `srun` command is available on your system but is not used.*",
-        )
-        warnings.filterwarnings(
-            "ignore",
-            ".*The value argument must be within the support of the distribution.*",
-        )
-        warnings.filterwarnings(
-            "ignore",
-            ".*MPS available but not used. Set `accelerator` and `devices` using.*",
-        )
-        warnings.filterwarnings(
-            "ignore",
-            r".*lr scheduler dict contains the key\(s\) \['monitor'\], but the keys will be.*",
+            "ignore", r".*lr scheduler dict contains the key\(s\) \['monitor'\], but the keys will be.*"
         )
         warnings.filterwarnings("ignore", ".*`use_gpu` is deprecated in v1.0 and will be removed in v1.1.*")
 
@@ -68,8 +48,7 @@ def ignore_predetermined_warnings():
 
         # raise error
         warnings.filterwarnings(
-            "error",
-            ".*set to `mps`. Please note that not all PyTorch operations are supported with.*",
+            "error", ".*set to `mps`. Please note that not all PyTorch operations are supported with.*"
         )
         yield
 

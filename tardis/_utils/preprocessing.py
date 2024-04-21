@@ -71,11 +71,7 @@ def select_hvgs(adata_var, top_gene_number, min_mean, max_mean):
     else:
         warnings.warn("`highly_variable_nbatches` is not found. Only `dispersions_norm` will be used.")
         adata_var.sort_values(
-            ["dispersions_norm"],
-            ascending=False,
-            na_position="last",
-            inplace=True,
-            ignore_index=False,
+            ["dispersions_norm"], ascending=False, na_position="last", inplace=True, ignore_index=False
         )
 
     if top_gene_number is None:

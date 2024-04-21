@@ -5,9 +5,9 @@ from scvi.dataloaders import DataSplitter
 from scvi.dataloaders._ann_dataloader import AnnDataLoader
 from torch.utils.data.dataloader import _BaseDataLoaderIter, _SingleProcessDataLoaderIter
 
-from ._counteractivegenerator import CounteractiveGenerator
-from ._disentenglementmanager import DisentanglementManager
-from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS
+from ._counteractiveminibatchgenerator import CounteractiveMinibatchGenerator
+from ._disentenglementtargetmanager import DisentenglementTargetManager
+from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS
 
 
 class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
@@ -20,16 +20,16 @@ class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
         index = self._next_index()  # may raise StopIteration
         data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
 
-        if len(DisentanglementManager.disentanglements) > 0:
-            data[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS] = dict()
+        if len(DisentenglementTargetManager.configurations) > 0:
+            data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS] = dict()
             # `data` is simply the minibatch itself.
             # The aim is create alternative minibatches that has the same keys as the original one
             # These minibatches, called counteractive minibatch, will be fed through `forward` method.
             for target_obs_key_ind, target_obs_key in enumerate(
-                DisentanglementManager.get_ordered_disentanglement_keys()
+                DisentenglementTargetManager.configurations.get_ordered_obs_key()
             ):
-                data[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][target_obs_key] = dict()
-                target_obs_key_tensors_indices_dict = CounteractiveGenerator.main(
+                data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key] = dict()
+                target_obs_key_tensors_indices_dict = CounteractiveMinibatchGenerator.main(
                     target_obs_key_ind=target_obs_key_ind,
                     # Full dataset and minibatch, loaded tensors can be configured by setup_anndata.
                     minibatch_tensors=data,
@@ -42,12 +42,9 @@ class _MySingleProcessDataLoaderIter(_SingleProcessDataLoaderIter):
                     # Note that this is index of `self._dataset.indices`, not the index of real full dataset.
                     minibatch_relative_index=index,
                 )
-                for (
-                    selection_key,
-                    target_obs_key_tensors_indices,
-                ) in target_obs_key_tensors_indices_dict.items():
+                for selection_key, target_obs_key_tensors_indices in target_obs_key_tensors_indices_dict.items():
                     target_obs_key_tensors = self._dataset_fetcher.fetch(target_obs_key_tensors_indices)
-                    data[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][target_obs_key][
+                    data[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key][
                         selection_key
                     ] = target_obs_key_tensors
 
@@ -130,10 +127,7 @@ class MyDataSplitter(DataSplitter):
         for key, value in batch.items():
             if isinstance(value, dict):
                 batch[key] = MyDataSplitter.convert_sparse_to_dense(value)  # Recursive call for nested dictionaries
-            elif isinstance(value, torch.Tensor) and value.layout in (
-                torch.sparse_csr,
-                torch.sparse_csc,
-            ):
+            elif isinstance(value, torch.Tensor) and value.layout in (torch.sparse_csr, torch.sparse_csc):
                 batch[key] = value.to_dense()  # Convert sparse tensor to dense
         return batch
 

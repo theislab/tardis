@@ -7,7 +7,8 @@ from scvi.module.base import LossOutput
 from scvi.train import TrainingPlan
 from scvi.train._metrics import ElboMetric
 
-from ._mymonitors import ProgressBarManager, TrainingEpochLogger, TrainingStepLogger
+from ._progressbarmanager import ProgressBarManager
+from ._trainingsteplogger import TrainingEpochLogger, TrainingStepLogger
 
 
 class MyTrainingPlan(TrainingPlan):
@@ -59,11 +60,7 @@ class MyTrainingPlan(TrainingPlan):
 
     @torch.inference_mode()
     def compute_and_log_metrics(
-        self,
-        loss_output: LossOutput,
-        metrics: dict[str, ElboMetric],
-        mode: str,
-        report_step_total_loss: bool = False,
+        self, loss_output: LossOutput, metrics: dict[str, ElboMetric], mode: str, report_step_total_loss: bool = False
     ):
         rec_loss = loss_output.reconstruction_loss_sum
         n_obs_minibatch = loss_output.n_obs_minibatch
