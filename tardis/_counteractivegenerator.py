@@ -9,8 +9,8 @@ import copy
 from scipy.sparse import spmatrix
 from scvi import REGISTRY_KEYS, settings
 
-from ._disentenglementmanager import DisentenglementManager
-from ._myconstants import NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
+from ._disentanglementmanager import DisentanglementManager
+from ._myconstants import NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY, REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 from ._mymonitor import TrainingStepLogger
 
 
@@ -37,10 +37,10 @@ class DatapointDefinitionsKeyGenerator:
             labels_definitions = np.zeros_like(batch_definitions)
 
         if operation_mode_torch:
-            group_definitions = dict_items[REGISTRY_KEY_DISENTENGLEMENT_TARGETS][:, target_obs_key_ind].view(-1, 1)
+            group_definitions = dict_items[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, target_obs_key_ind].view(-1, 1)
         else:
             group_definitions = (
-                dict_items[REGISTRY_KEY_DISENTENGLEMENT_TARGETS].iloc[:, target_obs_key_ind].values.reshape(-1, 1)
+                dict_items[REGISTRY_KEY_DISENTANGLEMENT_TARGETS].iloc[:, target_obs_key_ind].values.reshape(-1, 1)
             )
 
         catcovs_definitions = []
@@ -77,7 +77,7 @@ class CachedPossibleGroupDefinitionIndices:
         dataset_tensors_keys = set(dataset_tensors.keys())
         known_keys = dict(
             must_have_keys=[
-                REGISTRY_KEY_DISENTENGLEMENT_TARGETS,
+                REGISTRY_KEY_DISENTANGLEMENT_TARGETS,
                 REGISTRY_KEYS.X_KEY,
                 REGISTRY_KEYS.BATCH_KEY,
                 REGISTRY_KEYS.LABELS_KEY,
@@ -112,7 +112,7 @@ class CachedPossibleGroupDefinitionIndices:
                 f"of counteractive minibatch generation.\n{config}"
             )
 
-        ecc = copy.deepcopy(DisentenglementManager.anndata_manager_state_registry[REGISTRY_KEYS.CAT_COVS_KEY])
+        ecc = copy.deepcopy(DisentanglementManager.anndata_manager_state_registry[REGISTRY_KEYS.CAT_COVS_KEY])
         n_ecc = len(ecc["field_keys"]) if "field_keys" in ecc else 0
         cmk = copy.deepcopy(config.method_kwargs["within_categorical_covs"])
         n_cmk = 0 if cmk is None else len(cmk)
@@ -166,15 +166,7 @@ class CachedPossibleGroupDefinitionIndices:
         except KeyError:
             if data_split_identifier not in cls._items:
                 raise ValueError("The `reset` method should be called in the beginning.")
-            obs_key = DisentenglementManager.configurations.get_by_index(target_obs_key_ind).obs_key
-            warnings.warn(
-                message=(
-                    "Possible group definition indices are calculating "
-                    f"for `{obs_key}` for `{data_split_identifier}` set."
-                ),
-                category=UserWarning,
-                stacklevel=settings.warnings_stacklevel,
-            )
+            obs_key = DisentanglementManager.configurations.get_by_index(target_obs_key_ind).obs_key
             cls._initialize_verify_input(dataset_tensors=dataset_tensors)
             cls._initialize_verify_config(config=config)
             cls._initialize(dataset_tensors, target_obs_key_ind, data_split_identifier, splitter_index, config)
@@ -186,8 +178,8 @@ class CachedPossibleGroupDefinitionIndices:
             )
             warnings.warn(
                 message=(
-                    f"Number of elements in each group for `{obs_key}` "
-                    f"in `{data_split_identifier}` set: {lengths_to_report}"
+                    f"Possible group definition indices are calculated for `{obs_key}` for "
+                    f"`{data_split_identifier}` set. Number of elements in each group: {lengths_to_report}"
                 ),
                 category=UserWarning,
                 stacklevel=settings.warnings_stacklevel,
@@ -208,7 +200,7 @@ class CounteractiveGenerator:
         - method: Name of the method to use for generating the minibatch.
         - **kwargs: Keyword arguments passed to the method, including method-specific kwargs and common parameters.
         """
-        method = DisentenglementManager.configurations.get_by_index(
+        method = DisentanglementManager.configurations.get_by_index(
             target_obs_key_ind
         ).counteractive_minibatch_settings.method
         if (
@@ -239,7 +231,7 @@ class CounteractiveGenerator:
         minibatch_relative_index: list[int],
     ) -> Dict[str, list[int]]:
 
-        config = DisentenglementManager.configurations.items[target_obs_key_ind].counteractive_minibatch_settings
+        config = DisentanglementManager.configurations.items[target_obs_key_ind].counteractive_minibatch_settings
         possible_indices = CachedPossibleGroupDefinitionIndices.get(
             dataset_tensors, target_obs_key_ind, data_split_identifier, splitter_index, config
         )
@@ -254,7 +246,7 @@ class CounteractiveGenerator:
         rng = np.random.default_rng(  # Seeded RNG for consistency
             seed=CounteractiveGenerator.configuration_random_seed(config.method_kwargs["seed"])
         )
-        n_cat = DisentenglementManager.anndata_manager_state_registry["disentenglement_target"]["n_cats_per_key"][
+        n_cat = DisentanglementManager.anndata_manager_state_registry[REGISTRY_KEY_DISENTANGLEMENT_TARGETS]["n_cats_per_key"][
             target_obs_key_ind
         ]
         indice_group_definitions = 0

@@ -10,12 +10,12 @@ from scvi.module.base import LossOutput, auto_move_data
 from torch.distributions import kl_divergence as kl
 
 from ._auxillarylossesmixin import AuxillaryLossesMixin
-from ._disentenglementmanager import DisentenglementManager
+from ._disentanglementmanager import DisentanglementManager
 from ._metricsmixin import ModuleMetricsMixin
 from ._myconstants import (
     AUXILLARY_LOSS_MEAN,
     LOSS_NAMING_DELIMITER,
-    REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS,
+    REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS,
     WEIGHTED_LOSS_SUFFIX,
     minified_method_not_supported_message,
 )
@@ -32,7 +32,7 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
 
         # Modify `DisentenglementTargetManager` to define reserved latents in loss calculations.
         self.n_total_reserved_latent = 0
-        for dtconfig in DisentenglementManager.configurations.items:
+        for dtconfig in DisentanglementManager.configurations.items:
             dtconfig.reserved_latent_indices = list(
                 range(self.n_total_reserved_latent, self.n_total_reserved_latent + dtconfig.n_reserved_latent)
             )
@@ -43,10 +43,10 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
         if self.n_latent - self.n_total_reserved_latent < 1:
             raise ValueError("Not enough latent space variables to reserve for targets.")
         self.n_total_unreserved_latent = self.n_latent - self.n_total_reserved_latent
-        DisentenglementManager.configurations.unreserved_latent_indices = list(
+        DisentanglementManager.configurations.unreserved_latent_indices = list(
             range(self.n_total_reserved_latent, self.n_latent)
         )  # If no target is defined, this list will contain all latent space variables.
-        DisentenglementManager.configurations.latent_indices = list(range(self.n_latent))
+        DisentanglementManager.configurations.latent_indices = list(range(self.n_latent))
 
         self.auxillary_losses_keys: list[str] | None = None
         self.include_auxillary_loss = include_auxillary_loss
@@ -160,7 +160,7 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
 
         # `weighted_auxillary_losses` is also determined dynamically, depending on `warmup_epoch_range` parameter.
 
-        if REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS in tensors:
+        if REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS in tensors:
             # Then we are using the MyAnnDataLoader, which includes the counteractive minibatches. This happens
             # when the model is in training phase. Have a look at the `_data_loader_cls` in Model.
             # Removing this if-else loop causes model not loadable from drive.

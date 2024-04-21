@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from typing import List, Literal, Optional
-
+from .__DEBUG import DEBUG
 from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator, validator
 
 from ._mymonitor import AuxillaryLossWarmupManager
@@ -27,9 +27,9 @@ class TardisLoss(BaseModel):
     index: int | None = None
     loss_identifier_string: str | None = None
 
-    @validator("non_categorical_coefficient_method", always=True)
+    @field_validator("non_categorical_coefficient_method")
     def non_categorical_coefficient_method_must_be_defined_for_pseudo_categorical_loss(cls, v, values):
-        target_type = values.get("target_type")
+        target_type = values.data["target_type"]
         if target_type == "pseudo_categorical" and not isinstance(v, str):
             raise ValueError(
                 "`non_categorical_coefficient_method` should be defined if `target_type` is `pseudo_categorical`."
@@ -104,7 +104,7 @@ class AuxillaryLosses(BaseModel):
         raise KeyError("`identifier` is not amongst the defined losses.")
 
 
-class Disentenglement(BaseModel):
+class Disentanglement(BaseModel):
     obs_key: StrictStr
     n_reserved_latent: StrictInt
     counteractive_minibatch_settings: CounteractiveSettings
@@ -150,8 +150,8 @@ class Disentenglement(BaseModel):
             )
 
 
-class Disentenglements(BaseModel):
-    items: List[Disentenglement] = []
+class Disentanglements(BaseModel):
+    items: List[Disentanglement] = []
     # unreserved by any of the configuration.
     unreserved_latent_indices: Optional[List[int]] = None
     # complete list of indices, simply range(n_latent)

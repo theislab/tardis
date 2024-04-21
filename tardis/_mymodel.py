@@ -22,11 +22,11 @@ from scvi.model._utils import _init_library_size
 from scvi.model.base import ArchesMixin, BaseModelClass, RNASeqMixin, VAEMixin
 
 from ._counteractivegenerator import CachedPossibleGroupDefinitionIndices
-from ._disentenglement import Disentenglements
-from ._disentenglementmanager import DisentenglementManager
+from ._disentanglement import Disentanglements
+from ._disentanglementmanager import DisentanglementManager
 from ._metricsmixin import MetricsMixin
 from ._modelplotting import ModelPlotting
-from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTENGLEMENT_TARGETS
+from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 from ._mymodule import MyModule
 from ._mymonitor import AuxillaryLossWarmupManager, ProgressBarManager, TrainingEpochLogger, TrainingStepLogger
 from ._mytrainingmixin import MyUnsupervisedTrainingMixin
@@ -99,13 +99,13 @@ class MyModel(
         TrainingEpochLogger.reset()
         AuxillaryLossWarmupManager.reset()
         ProgressBarManager.reset()
-        DisentenglementManager.reset()
+        DisentanglementManager.reset()
         CachedPossibleGroupDefinitionIndices.reset()
 
         if disentenglement_targets_configurations is None:
             disentenglement_targets_configurations = []
         # This also checks whether the dict follows the format required.
-        disentenglement_targets_configurations = Disentenglements(items=disentenglement_targets_configurations)
+        disentenglement_targets_configurations = Disentanglements(items=disentenglement_targets_configurations)
 
         _dtsak = disentenglement_targets_configurations.get_ordered_obs_key()
         disentenglement_targets_setup_anndata_keys = _dtsak if len(_dtsak) > 0 else None
@@ -117,7 +117,7 @@ class MyModel(
             NumericalObsField(REGISTRY_KEYS.SIZE_FACTOR_KEY, size_factor_key, required=False),
             CategoricalJointObsField(REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys),
             NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
-            CategoricalJointObsField(REGISTRY_KEY_DISENTENGLEMENT_TARGETS, disentenglement_targets_setup_anndata_keys),
+            CategoricalJointObsField(REGISTRY_KEY_DISENTANGLEMENT_TARGETS, disentenglement_targets_setup_anndata_keys),
         ]
         adata_minify_type = _get_adata_minify_type(adata)
         assert adata_minify_type is None, f"{MODEL_NAME} model currently does not support minified data."
@@ -125,8 +125,8 @@ class MyModel(
         adata_manager.register_fields(adata, **kwargs)
         cls.register_manager(adata_manager)
 
-        DisentenglementManager.set_configurations(value=disentenglement_targets_configurations)
-        DisentenglementManager.set_anndata_manager_state_registry(
+        DisentanglementManager.set_configurations(value=disentenglement_targets_configurations)
+        DisentanglementManager.set_anndata_manager_state_registry(
             value={
                 registry_key: adata_manager.registry["field_registries"][registry_key]["state_registry"]
                 for registry_key in adata_manager.registry["field_registries"]

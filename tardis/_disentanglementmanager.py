@@ -2,14 +2,14 @@
 
 import numpy as np
 
-from ._disentenglement import Disentenglements
-from ._myconstants import REGISTRY_KEY_DISENTENGLEMENT_TARGETS
+from ._disentanglement import Disentanglements
+from ._myconstants import REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 from ._utils.functions import isnumeric
 
 
-class DisentenglementManager:
+class DisentanglementManager:
 
-    configurations: "Disentenglements"
+    configurations: "Disentanglements"
     anndata_manager_state_registry: dict
     _categorical_to_value: dict
 
@@ -32,7 +32,7 @@ class DisentenglementManager:
         try:
             return cls._categorical_to_value[obs_key]
         except KeyError:
-            array = cls.anndata_manager_state_registry[REGISTRY_KEY_DISENTENGLEMENT_TARGETS]["mappings"][obs_key]
+            array = cls.anndata_manager_state_registry[REGISTRY_KEY_DISENTANGLEMENT_TARGETS]["mappings"][obs_key]
             is_numeric = all([isnumeric(element) for element in array])
             # print(obs_key, is_numeric, [element.isnumeric() for element in array])
             cls._categorical_to_value[obs_key] = {i: (float(j) if is_numeric else j) for i, j in enumerate(array)}

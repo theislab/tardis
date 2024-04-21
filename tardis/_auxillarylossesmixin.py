@@ -8,7 +8,7 @@ from scvi import REGISTRY_KEYS
 from scvi.module.base import auto_move_data
 from torch.distributions import Normal, kl_divergence
 
-from ._disentenglementmanager import DisentenglementManager as DTM
+from ._disentanglementmanager import DisentanglementManager as DTM
 from ._myconstants import (
     BOTH_EXAMPLE_KEY,
     LATENT_INDEX_GROUP_COMPLETE,
@@ -17,8 +17,8 @@ from ._myconstants import (
     LATENT_INDEX_GROUP_UNRESERVED_COMPLETE,
     NEGATIVE_EXAMPLE_KEY,
     POSITIVE_EXAMPLE_KEY,
-    REGISTRY_KEY_DISENTENGLEMENT_TARGETS,
-    REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS,
+    REGISTRY_KEY_DISENTANGLEMENT_TARGETS,
+    REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS,
 )
 from ._mymonitor import AuxillaryLossWarmupManager, TrainingEpochLogger
 
@@ -62,12 +62,12 @@ class AuxillaryLossesMixin:
 
             # Although sometimes `inference_counteractive_positive` or `inference_counteractive_negative` are not
             # used at all, calculate for coding simplicity. Needs optimization for deployment.
-            tensors_positive = tensors[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key][
+            tensors_positive = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][target_obs_key][
                 POSITIVE_EXAMPLE_KEY
             ]
             inference_counteractive_positive = self.inference_counteractive_minibatch(tensors_positive)
 
-            tensors_negative = tensors[REGISTRY_KEY_DISENTENGLEMENT_TARGETS_TENSORS][target_obs_key][
+            tensors_negative = tensors[REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS][target_obs_key][
                 NEGATIVE_EXAMPLE_KEY
             ]
             inference_counteractive_negative = self.inference_counteractive_minibatch(tensors_negative)
@@ -157,8 +157,8 @@ class AuxillaryLossesMixin:
                 )
 
             obs_key = DTM.configurations.get_by_index(i).obs_key
-            ti = t[REGISTRY_KEY_DISENTENGLEMENT_TARGETS][:, i].detach().cpu().numpy()
-            tni = tn[REGISTRY_KEY_DISENTENGLEMENT_TARGETS][:, i].detach().cpu().numpy()
+            ti = t[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, i].detach().cpu().numpy()
+            tni = tn[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][:, i].detach().cpu().numpy()
             ti_values = torch.tensor(DTM.convert_array_categorical_to_value(obs_key=obs_key, array=ti)).to(device)
             tni_values = torch.tensor(DTM.convert_array_categorical_to_value(obs_key=obs_key, array=tni)).to(device)
 
