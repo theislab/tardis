@@ -8,23 +8,24 @@ repos:
         types: [python]
         args: ["--line-length", "120"]
         require_serial: true
+        exclude: "^training/"
       - id: isort
         name: isort (python)
         entry: isort
         language: system
-        exclude: '.*\.ipynb$'
+        exclude: '.*\.ipynb$|^training/'
       - id: isort
         name: isort (cython)
         types: [cython]
         entry: isort
         language: system
-        exclude: '.*\.ipynb$'
+        exclude: '.*\.ipynb$|^training/'
       - id: isort
         name: isort (pyi)
         types: [pyi]
         entry: isort
         language: system
-        exclude: '.*\.ipynb$'
+        exclude: '.*\.ipynb$|^training/'
       - id: check-added-large-files
         name: Check for added large files
         entry: check-added-large-files
@@ -34,24 +35,27 @@ repos:
         entry: check-toml
         language: system
         types: [toml]
+        exclude: "^training/"
       - id: check-yaml
         name: Check Yaml
         entry: check-yaml
         language: system
         types: [yaml]
+        exclude: "^training/"
       - id: end-of-file-fixer
         name: Fix End of Files
         entry: end-of-file-fixer
         language: system
         types: [text]
         stages: [commit, push, manual]
-        exclude: docs/
+        exclude: "docs/|^training/"
       - id: flake8
         name: flake8
         entry: flake8
         language: system
         types: [python]
         require_serial: true
+        exclude: "^training/"
       - id: pyupgrade
         name: pyupgrade
         description: Automatically upgrade syntax for newer versions.
@@ -59,13 +63,16 @@ repos:
         language: system
         types: [python]
         args: [--py38-plus]
+        exclude: "^training/"
       - id: trailing-whitespace
         name: Trim Trailing Whitespace
         entry: trailing-whitespace-fixer
         language: system
         types: [text]
         stages: [commit, push, manual]
+        exclude: "^training/"
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v2.5.1
     hooks:
       - id: prettier
+        exclude: "^training/"

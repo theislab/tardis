@@ -1,29 +1,20 @@
-print("import libs", flush=True)
-
 import copy
 import gc
-import logging
 import os
 import sys
 import warnings
-from functools import reduce
-from pathlib import Path
 
 import anndata as ad
-import numpy as np
-import pandas as pd
 import scanpy as sc
-import scipy
-import tqdm
 from scanpy.preprocessing._highly_variable_genes import highly_variable_genes
 
 sys.path.append("/home/icb/kemal.inecik/work/codes/tardis")
-from tardis._utils.preprocessing import (
+from tardis._utils.preprocessing import (  # noqa
+    NA_CELL_TYPE_PLACEHOLDER,
+    RANK_GENES_GROUPS_KEY,
     calculate_de_genes,
     deep_memory_usage,
     select_hvgs,
-    NA_CELL_TYPE_PLACEHOLDER,
-    RANK_GENES_GROUPS_KEY
 )
 
 sc.settings.verbosity = 3
@@ -42,7 +33,7 @@ print(f"Estimated adata memory usage: {deep_memory_usage(adata)} MB")
 for handle in adata.obs["handle_anndata"].value_counts().index:
     print("###", flush=True)
     print(handle, flush=True)
-    
+
     adata_dataset_1 = adata[adata.obs["handle_anndata"] == handle]
     var_column = f"{GENE_NAME_COLUMN}_{handle}"
     adata_dataset_1 = adata_dataset_1[:, adata_dataset_1.var[var_column] != NA_CELL_TYPE_PLACEHOLDER].copy()
@@ -55,26 +46,22 @@ for handle in adata.obs["handle_anndata"].value_counts().index:
     adata_dataset_1.layers["counts"] = adata_dataset_1.X.copy()
     sc.pp.normalize_total(adata_dataset_1, target_sum=1e6)
     sc.pp.log1p(adata_dataset_1)
-    
+
     # Calculate dispersion and mean with scanpy function to determine max and min means.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         highly_variable_genes(
-            adata=adata_dataset_1, 
-            layer=None, 
-            batch_key="concatenated_integration_covariates", 
-            subset=False, 
-            inplace=True
+            adata=adata_dataset_1,
+            layer=None,
+            batch_key="concatenated_integration_covariates",
+            subset=False,
+            inplace=True,
         )
         adata_dataset_1.var.drop(columns=["highly_variable"], inplace=True)
     adata_dataset_1_var_before = adata_dataset_1.var.copy()
-    gc.collect();
+    gc.collect()
 
-    hvg_dict = dict(
-        hvg_number=2**13, 
-        min_mean=0.05, 
-        max_mean=3
-    )
+    hvg_dict = dict(hvg_number=2**13, min_mean=0.05, max_mean=3)
 
     _, final_hvg_selection, _ = select_hvgs(
         adata_var=adata_dataset_1.var.copy(),
@@ -87,22 +74,31 @@ for handle in adata.obs["handle_anndata"].value_counts().index:
 
     print(f"Estimated adata memory usage: {deep_memory_usage(adata_dataset_1)} MB", flush=True)
 
-    adata_dataset_1.X = adata_dataset_1.layers["counts"].copy()
-    del adata_dataset_1.layers
-    del adata_dataset_1.uns
-    del adata_dataset_1.var
-    adata_dataset_1.obs = adata_dataset_1.obs[['sample_ID', 'organ', 'age', 'cell_type', 'sex', 'sex_inferred', 'concatenated_integration_covariates',
-                           'integration_donor', 'integration_biological_unit', 'integration_sample_status', 'integration_library_platform_coarse']]
+    adata_dataset_1 = ad.AnnData(
+        X=adata_dataset_1.layers["counts"],
+        obs=adata_dataset_1.obs[
+            [
+                "sample_ID",
+                "organ",
+                "age",
+                "cell_type",
+                "sex",
+                "sex_inferred",
+                "concatenated_integration_covariates",
+                "integration_donor",
+                "integration_biological_unit",
+                "integration_sample_status",
+                "integration_library_platform_coarse",
+            ]
+        ],
+    ).copy()
     gc.collect()
-    
+
     print(f"Estimated adata memory usage: {deep_memory_usage(adata_dataset_1)} MB", flush=True)
-    
+
     print(adata_dataset_1, flush=True)
 
-    write_path = (
-        "/lustre/groups/ml01/workspace/kemal.inecik/tardis_data/processed/"
-        f"dataset_complete_{handle}.h5ad"
-    )
+    write_path = "/lustre/groups/ml01/workspace/kemal.inecik/tardis_data/processed/" f"dataset_complete_{handle}.h5ad"
     adata_dataset_1.write_h5ad(write_path)
 
     sc.pp.filter_cells(adata_dataset_1, min_genes=10, inplace=True)
@@ -114,10 +110,10 @@ for handle in adata.obs["handle_anndata"].value_counts().index:
         warnings.filterwarnings("ignore", ".*DataFrame is highly fragmented.*")
         calculate_de_genes(adata_dataset_1)
     calc_de = copy.deepcopy(adata_dataset_1.uns[RANK_GENES_GROUPS_KEY])
-    
+
     del adata_dataset_1
-    gc.collect();
-    
+    gc.collect()
+
     adata_dataset_1 = ad.read_h5ad(write_path)
     sc.pp.filter_cells(adata_dataset_1, min_genes=10, inplace=True)
     adata_dataset_1.uns[RANK_GENES_GROUPS_KEY] = calc_de
@@ -125,6 +121,6 @@ for handle in adata.obs["handle_anndata"].value_counts().index:
     adata_dataset_1.write_h5ad(write_path)
     print(f"Estimated adata memory usage: {deep_memory_usage(adata_dataset_1)} MB", flush=True)
     del adata_dataset_1
-    gc.collect();
+    gc.collect()
 
 print("\n\n\nDONE\n\n\n", flush=True)

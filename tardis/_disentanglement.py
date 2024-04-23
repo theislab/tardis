@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
 from typing import List, Literal, Optional
-from .__DEBUG import DEBUG
-from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator, validator
 
-from ._mymonitor import AuxillaryLossWarmupManager
+from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator
+
 from ._myconstants import EXAMPLE_KEYS, LATENT_INDEX_GROUP_NAMES, LOSS_NAMING_DELIMITER, LOSS_NAMING_PREFIX
-from ._mymonitor import ProgressBarManager
+from ._mymonitor import AuxillaryLossWarmupManager, ProgressBarManager
 
 
 class TardisLoss(BaseModel):

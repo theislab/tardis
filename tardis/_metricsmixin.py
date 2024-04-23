@@ -328,8 +328,138 @@ class MetricsMixin:
 
         return score
 
-    # TODO: implement distentenglement measures
-    # How do you define disentenglement. Look at papers.
-    # Intuitive idea: run sklearn classifiers on the data, test their accuracy, with and without tardis loss
-    #     for reserved and unreserved latent spaces
+    @staticmethod
+    def _calculate_entropy(labels):
+        """Computes the entropy of a given label distribution, which is used for mutual information normalization.
+
+        It handles the computation for discrete distributions, which is suitable for
+        both continuous (if binned) and categorical data.
+        """
+        labels = labels.flatten()
+        value, counts = np.unique(labels, return_counts=True)
+        return scipy.stats.entropy(counts, base=np.e)
+
+    @staticmethod
+    def _discretize_latent(data, bins):
+        """Discretize continuous data into equal-frequency bins."""
+        return pd.qcut(data, q=bins, labels=False, duplicates="drop")
+
+    @staticmethod
+    def get_MI_precalculated(data, factors, variation, discretization_bins):
+        """Computes MIs score for a set of latent variables and their corresponding factors.
+
+        :param data: A numpy array of shape (num_samples, num_latent_variables),
+                                where each column represents a latent variable.
+        :param factors: A numpy array of shape (num_samples, num_factors), where each column
+                        represents a factor, and equal to num_latent_variables
+        :return: score for each latent
+        """
+        num_latent_vars = data.shape[1]
+        num_factors = factors.shape[1]
+
+        scores = []
+
+        for i in range(num_latent_vars):
+            entropy_si = MetricsMixin._calculate_entropy(factors[:, i])
+            discretized_latent = MetricsMixin._discretize_latent(data[:, i], bins=discretization_bins)
+            mi_with_si = sklearn.metrics.mutual_info_score(discretized_latent, factors[:, i])
+
+            if variation == "normalized":
+                scores.append(mi_with_si / entropy_si)
+
+            elif variation == "maxMIG":
+                mi_with_others = np.array(
+                    [
+                        sklearn.metrics.mutual_info_score(discretized_latent, factors[:, j])
+                        for j in range(num_factors)
+                        if j != i
+                    ]
+                )
+                max_mi_with_others = np.max(mi_with_si - mi_with_others)
+                scores.append(max_mi_with_others / entropy_si)
+            elif variation == "catMIG":
+                raise NotImplementedError
+            else:
+                raise ValueError
+
+        return scores
+
+    @torch.inference_mode()
+    @unsupported_if_adata_minified
+    def get_MI_normalized(
+        self,
+        target_factor_key: str,
+        discretization_bins: int = 256,
+        adata: Optional[AnnData] = None,
+        indices: Optional[Sequence[int]] = None,
+    ) -> float:
+        adata = self._validate_anndata(adata if adata is not None else self.adata_manager.adata)
+        data = self.get_latent_representation(adata=adata, indices=indices)
+
+        factors = np.expand_dims(
+            sklearn.preprocessing.LabelEncoder().fit_transform(
+                adata.obs[target_factor_key].astype(str).values.flatten()
+            ),
+            axis=1,
+        )
+        factors = np.broadcast_to(factors, (factors.shape[0], self.module.n_latent))
+
+        return MetricsMixin.get_MI_precalculated(
+            data=data,
+            factors=factors,
+            variation="normalized",
+            discretization_bins=discretization_bins,
+        )
+
+    @staticmethod
+    def get_uncertainty_precalculated(
+        data, labels: Union[list, np.ndarray, pd.Series], n_neighbors: int = 30
+    ) -> np.ndarray:
+        """Evaluate uncertainty of prediction using labels provided. Based on chemCPA uncertainty definition.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            The data matrix with rows as samples and columns as features.
+        labels : pd.Series or list
+            Labels corresponding to the rows in `data`.
+        n_neighbors : int
+            Number of neighbors to consider.
+
+        Returns
+        -------
+        np.ndarray
+            Array of uncertainty values for each data point.
+        """
+        if isinstance(labels, list) or isinstance(labels, np.ndarray):
+            labels = pd.Series(labels)
+
+        nbrs = sklearn.neighbors.NearestNeighbors(n_neighbors=n_neighbors + 1, algorithm="auto").fit(data)
+        distances, indices = nbrs.kneighbors(data)
+        uncertainties = np.zeros(data.shape[0])
+
+        for i in range(data.shape[0]):
+            neighbor_indices = indices[i][1:]  # skip the first index because it's the point itself
+            neighbor_labels = labels.iloc[neighbor_indices]
+            uncertainty = MetricsMixin._calculate_entropy(neighbor_labels)
+            uncertainties[i] = 1 / np.log(sum(distances[i])) * uncertainty
+
+        return uncertainties
+
+    @torch.inference_mode()
+    @unsupported_if_adata_minified
+    def get_uncertainty(
+        self,
+        target_factor_key: str,
+        n_neighbors: int = 30,
+        adata: Optional[AnnData] = None,
+        indices: Optional[Sequence[int]] = None,
+    ) -> np.ndarray:
+        adata = self._validate_anndata(adata if adata is not None else self.adata_manager.adata)
+        data = self.get_latent_representation(adata=adata, indices=indices)
+
+        labels = adata.obs[target_factor_key].astype(str).values
+
+        return MetricsMixin.get_uncertainty_precalculated(data=data, labels=labels, n_neighbors=n_neighbors)
+
     # AWS, LISI etc for reserved and unreserved latent given label is the target metadata

@@ -40,6 +40,8 @@ class DisentanglementManager:
 
     @classmethod
     def convert_array_categorical_to_value(cls, obs_key, array):
-        map_values = lambda x: cls.get_categorical_to_value_dict(obs_key)[x]
-        vectorized_map = np.vectorize(map_values)
+        def _map_values(x):
+            return cls.get_categorical_to_value_dict(obs_key)[x]
+
+        vectorized_map = np.vectorize(_map_values)
         return vectorized_map(array)

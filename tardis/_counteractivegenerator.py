@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
+import copy
+import warnings
 from typing import Dict
 
-import warnings
 import numpy as np
 import torch
-import copy
 from scipy.sparse import spmatrix
 from scvi import REGISTRY_KEYS, settings
 
@@ -203,11 +203,7 @@ class CounteractiveGenerator:
         method = DisentanglementManager.configurations.get_by_index(
             target_obs_key_ind
         ).counteractive_minibatch_settings.method
-        if (
-            not hasattr(CounteractiveGenerator, method)
-            or method == "main"
-            or not callable(getattr(cls, method))
-        ):
+        if not hasattr(CounteractiveGenerator, method) or method == "main" or not callable(getattr(cls, method)):
             raise AttributeError(f"{cls.__name__} does not have a callable attribute '{method}'.")
         else:
             class_function = getattr(cls, method)
@@ -246,9 +242,9 @@ class CounteractiveGenerator:
         rng = np.random.default_rng(  # Seeded RNG for consistency
             seed=CounteractiveGenerator.configuration_random_seed(config.method_kwargs["seed"])
         )
-        n_cat = DisentanglementManager.anndata_manager_state_registry[REGISTRY_KEY_DISENTANGLEMENT_TARGETS]["n_cats_per_key"][
-            target_obs_key_ind
-        ]
+        n_cat = DisentanglementManager.anndata_manager_state_registry[REGISTRY_KEY_DISENTANGLEMENT_TARGETS][
+            "n_cats_per_key"
+        ][target_obs_key_ind]
         indice_group_definitions = 0
         random_ints = rng.integers(0, n_cat, size=minibatch_definitions.shape[0])
         minibatch_definitions[:, indice_group_definitions] = np.where(

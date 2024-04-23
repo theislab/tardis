@@ -152,3 +152,5 @@ tardis/__DEBUG*
 !.vscode/launch.json
 !.vscode/extensions.json
 !.vscode/*.code-snippets
+
+*.out
