@@ -4,6 +4,9 @@ io_directories:
   processed:
     relative_to: storage_directory
     path: processed
+  temp:
+    relative_to: storage_directory
+    path: temp
   figures:
     relative_to: training_repository
     path: figures
