@@ -121,6 +121,7 @@ dependencies:
   - chex # scib-metrics dependency
   - setuptools>=18.0.1 # PhenoGraph dependency
   - psutil>4 # PhenoGraph dependency
+  - bioconda::harmony-pytorch=0.1.8
   - pip:
       - PhenoGraph==1.5.7
       - rapids-singlecell==0.9.6 # Should be commented out for MAC Silicon
