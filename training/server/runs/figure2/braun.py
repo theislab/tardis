@@ -21,7 +21,7 @@ import tardis
 tardis.config = tardis.config_server
 print(f"CUDA used: {torch.cuda.is_available()}")
 
-adata_file_path = os.path.join(tardis.config.io_directories["processed"], "dataset_complete_Garcia.h5ad")
+adata_file_path = os.path.join(tardis.config.io_directories["processed"], "dataset_complete_Braun.h5ad")
 assert os.path.isfile(adata_file_path), f"File not already exist: `{adata_file_path}`"
 adata = ad.read_h5ad(adata_file_path)
 adata.obs["age"] = adata.obs["age"].astype("str").astype("category")

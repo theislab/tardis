@@ -12,12 +12,7 @@ scib_metric = sys.argv[3]
 
 latent_subset_identifiers = sys.argv[4]
 latent_subsets = sys.argv[5]
-
-scib_metrics = dict(
-    "bioconservation": [1,2,3,4]
-    "batchcorrection": [1,2,3,4]
-)
-metric_list = scib_metrics[scib_metric]
+adata_dir = sys.argv[6]
 
 import anndata as ad
 import numpy as np
@@ -32,68 +27,111 @@ sc.settings.verbosity = 3
 
 print("data_loading", flush=True)
 latent = ad.read_h5ad(latent_dir)
+adata = ad.read_h5ad(adata_dir)
+
+if scib_metric == "batchcorrection":
+    biocons = BioConservation(
+        isolated_labels=False,
+        nmi_ari_cluster_labels_leiden=False,
+        nmi_ari_cluster_labels_kmeans=False,
+        silhouette_label=False,
+        clisi_knn=False
+    )
+    batchcor = BatchCorrection()
+elif scib_metric == "bioconservation":
+    biocons = BioConservation()
+    batchcor = BatchCorrection(
+        silhouette_batch=False,
+        ilisi_knn=False,
+        kbet_per_label=False,
+        graph_connectivity=False,
+        pcr_comparison=False
+    )
+else:
+    raise ValueError
+
+
+def get_results(self, min_max_scale: bool = True) -> pd.DataFrame:
+    _LABELS = "labels"
+    _BATCH = "batch"
+    _X_PRE = "X_pre"
+    _METRIC_TYPE = "Metric Type"
+    _AGGREGATE_SCORE = "Aggregate score"
+    
+    df = self._results.transpose()
+    df.index.name = "Embedding"
+    df = df.loc[df.index != _METRIC_TYPE]
+    if min_max_scale:
+        # Use sklearn to min max scale
+        df = pd.DataFrame(
+            MinMaxScaler().fit_transform(df),
+            columns=df.columns,
+            index=df.index,
+        )
+    df = df.transpose()
+    df[_METRIC_TYPE] = self._results[_METRIC_TYPE].values
+
+    # Compute scores
+    per_class_score = df.groupby(_METRIC_TYPE).mean().transpose()
+    # This is the default scIB weighting from the manuscript
+    # per_class_score["Total"] = 0.4 * per_class_score["Batch correction"] + 0.6 * per_class_score["Bio conservation"]
+    df = pd.concat([df.transpose(), per_class_score], axis=1)
+    df.loc[_METRIC_TYPE, per_class_score.columns] = _AGGREGATE_SCORE
+    return df
 
 if model_type == "tardis":
     latent_subset_identifiers = latent_subset_identifiers.strip().split(".")
     latent_subsets = [list(map(int, i.strip().split(','))) for i in latent_subsets.strip().split('.')]
     subsets = {k: v for k,v in zip(latent_subset_identifiers, latent_subsets)}
-    
-    latent = latent[:, subsets["unreserved"]].copy()
+
     # calculate only for this one
-elif model_type == "scvi":
-    # get unintegrated
-    # get scvi latent
-    # get harmony
-    # calculate for all three
-
-latent
-adata = ad.read_h5ad(latent_dir)
-
-for a_metric in metric_list:
+    latent.obsm["tardis"] = latent[:, subsets["unreserved"]].X
+    latent.obsm["Unintegrated"] = adata.obsm["Unintegrated"]
+    print(latent, flush=True)
     
-    print(a_metric)
-
+    print("starting tardis scib", flush=True)
     bm = Benchmarker(
-        adata,
+        adata=latent,
         batch_key="concatenated_integration_covariates",
         label_key="cell_type",
-        embedding_obsm_keys=["X"],
-        pre_integrated_embedding_obsm_key="X_pca",
+        embedding_obsm_keys=["tardis"],
+        pre_integrated_embedding_obsm_key="Unintegrated",  # equals to X_pca
         bio_conservation_metrics=biocons,
+        batch_correction_metrics=batchcor,
         n_jobs=-1,
     )
+    bm.benchmark()
+    print("done", flush=True)
+    df = get_results(bm, min_max_scale=False)
     
+elif model_type == "scvi":
     
-    # adata_subset = ad.AnnData(X=adata[:, subset_latent].X, obs=adata.obs)
-    
-    # rsc.utils.anndata_to_GPU(adata_subset)
-    # rsc.pp.neighbors(adata=adata_subset, n_neighbors=n_neighbors)
-    # rsc.tl.umap(adata=adata_subset)
+    adata.obsm["scvi"] = latent.X
+    adata = adata.copy()
+    print(adata, flush=True)
+    print("starting scvi scib", flush=True)
+    bm = Benchmarker(
+        adata=adata,
+        batch_key="concatenated_integration_covariates",
+        label_key="cell_type",
+        embedding_obsm_keys=["X_pca", "harmony", "scvi"],
+        pre_integrated_embedding_obsm_key="Unintegrated",  # equals to X_pca
+        bio_conservation_metrics=biocons,
+        batch_correction_metrics=batchcor,
+        n_jobs=-1,
+    )
+    bm.benchmark()
+    df = get_results(bm, min_max_scale=False)
+else:
+    raise ValueError
 
-    # p1, p2 = os.path.splitext(latent_dir)
-    # p = p1 + "_subset-" + "-".join(c) + p2
-    # print(p)
 
-    # h = dict(
-    #     subset = c,
-    #     subset_indices = subset_latent,
-    #     main_latent = latent_dir,
-    #     subset_latent = p
-    # )
-    
-    # adata_subset.uns["tardis_subset"] = h
-    # to_main_latent.append(copy.deepcopy(h))
-    
-    # print("writing", flush=True)
-    # adata_subset.write_h5ad(latent_dir)
-    
-    # del adata_subset
-    gc.collect()
-    cp.get_default_memory_pool().free_all_blocks()
-    cp.get_default_pinned_memory_pool().free_all_blocks()
-    gc.collect()
+print(df, flush=True)
 
-adata.uns["tardis_subsets"] = to_main_latent
-adata.write_h5ad(latent_dir)
+p1, p2 = os.path.splitext(latent_dir)
+p = p1 + f"_scib_{scib_metric}.pickle"
+print(p, flush=True)
+
+df.to_pickle(p)
 
 

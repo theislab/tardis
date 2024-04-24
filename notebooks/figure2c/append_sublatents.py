@@ -5,6 +5,7 @@ import sys
 import warnings
 import importlib
 from pathlib import Path
+import itertools
 
 latent_dir = sys.argv[1]
 print(latent_dir)
@@ -50,10 +51,9 @@ combinations = [c for n_combination in range(1, len(subsets)) for c in sorted(it
 print("data_loading", flush=True)
 adata = ad.read_h5ad(latent_dir)
 
-
 # butun permutasyonlar icin umap hesaplat..
 to_main_latent = []
-for c in combinations:
+for ind, c in enumerate(combinations):
     subset_latent = sorted([i for j in c for i in subsets[j]])
     print(c)
     print(subset_latent)
@@ -69,17 +69,17 @@ for c in combinations:
     print(p)
 
     h = dict(
-        subset = c,
-        subset_indices = subset_latent,
+        subset = np.array(list(c)),
+        subset_indices = np.array(subset_latent),
         main_latent = latent_dir,
         subset_latent = p
     )
     
     adata_subset.uns["tardis_subset"] = h
-    to_main_latent.append(copy.deepcopy(h))
+    to_main_latent.append(p)
     
     print("writing", flush=True)
-    adata_subset.write_h5ad(latent_dir)
+    adata_subset.write_h5ad(p)
     
     del adata_subset
     gc.collect()
@@ -87,6 +87,7 @@ for c in combinations:
     cp.get_default_pinned_memory_pool().free_all_blocks()
     gc.collect()
 
+print("writing the main", flush=True)
 adata.uns["tardis_subsets"] = to_main_latent
 adata.write_h5ad(latent_dir)
 
