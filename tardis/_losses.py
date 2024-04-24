@@ -10,6 +10,8 @@ from ._myconstants import (
     LOSS_NAMING_DELIMITER,
     LOSS_NAMING_PREFIX,
     REGISTRY_KEY_DISENTANGLEMENT_TARGETS,
+    LATENT_INDEX_GROUP_RESERVED,
+    LATENT_INDEX_GROUP_UNRESERVED,
 )
 from ._progressbarmanager import ProgressBarManager
 from ._trainingsteplogger import TrainingEpochLogger
@@ -44,9 +46,9 @@ class LossesBase:
 
             latent_group = loss_config["latent_group"]
 
-            if latent_group == "reserved":
+            if latent_group == LATENT_INDEX_GROUP_RESERVED:
                 self.reserved.append(loss_obj)
-            elif latent_group == "unreserved":
+            elif latent_group == LATENT_INDEX_GROUP_UNRESERVED:
                 self.unreserved.append(loss_obj)
             else:
                 self.complete.append(loss_obj)
@@ -193,6 +195,12 @@ class LossesBase:
 
 
 class Losses(LossesBase):
+    def __init__(self, loss_configs, obs_key):
+        super().__init__(loss_configs, obs_key)
+
+        self.complete = self.complete + self.reserved + self.unreserved
+        self.reserved = []
+        self.unreserved = []
 
     def get_total_loss(
         self,

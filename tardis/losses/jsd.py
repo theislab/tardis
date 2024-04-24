@@ -17,7 +17,7 @@ class JSDNormal(TardisLoss):
         counteractive_outputs: Dict[str, torch.Tensor],
         relevant_latent_indices: torch.Tensor,
     ) -> torch.Tensor:
-        self._validate_forward_inputs(outputs, counteractive_outputs, relevant_latent_indices)
+
         qz_inference = outputs["qz"]
         qz_counteractive = counteractive_outputs["qz"]
 
