@@ -6,7 +6,7 @@ io_directories:
     path: processed
   temp:
     relative_to: storage_directory
-    path: temp
+    path: _temporary
   figures:
     relative_to: training_repository
     path: figures

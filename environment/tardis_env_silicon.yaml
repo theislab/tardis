@@ -128,7 +128,6 @@ dependencies:
       - scib==1.1.3
       - louvain==0.8.2
       - scikit-misc==0.1.4
-      # - pertpy==0.7.0
       # types
       - types-Send2Trash
       - types-colorama

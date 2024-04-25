@@ -36,9 +36,9 @@ while true; do
     case $choice in
         1) rclone sync -v --progress -L "$SERVER_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}"
            ;;
-        2) rclone sync -v --progress "$LOCAL_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}"
+        2) rclone sync -v --progress "$LOCAL_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}" --exclude '*_temporary/**'
            ;;
-        3) rclone sync -v --progress "$DRIVE_DATA_PATH" "$LOCAL_DATA_PATH" "${COMMON_EXCLUDES[@]}"
+        3) rclone sync -v --progress "$DRIVE_DATA_PATH" "$LOCAL_DATA_PATH" "${COMMON_EXCLUDES[@]}" --exclude '*_temporary/**'
            ;;
         4) rclone sync -v --progress "$DRIVE_DATA_PATH" "$SERVER_DATA_PATH" "${COMMON_EXCLUDES[@]}"
            ;;
