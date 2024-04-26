@@ -169,7 +169,7 @@ vae.train(**train_params)
 
 dir_path = os.path.join(
     tardis.config.io_directories["models"],
-    "sciplex-cpa_age_dose-continuous"
+    "sciplex-cpa_age_dose-continuous_1"
 )
 
 vae.save(

@@ -93,7 +93,7 @@ train_params = dict(
     check_val_every_n_epoch=10,
     learning_rate_monitor=True,
     # early stopping:
-    early_stopping=True,
+    early_stopping=False,
     early_stopping_patience=150,
     early_stopping_monitor="elbo_train",
     plan_kwargs = dict(
