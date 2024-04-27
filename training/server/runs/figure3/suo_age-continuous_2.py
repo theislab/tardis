@@ -25,8 +25,10 @@ adata_file_path = os.path.join(tardis.config.io_directories["processed"], "datas
 assert os.path.isfile(adata_file_path), f"File not already exist: `{adata_file_path}`"
 adata = ad.read_h5ad(adata_file_path)
 adata.obs["age"] = adata.obs["age"].astype("str").astype("category")
+adata.obs['age_continuous'] = adata.obs['age'].astype(float)
+adata.obs['age_training'] = adata.obs['age_continuous'].rank(method='dense').astype(int).astype(str)
 
-warmup_epoch_range = [12, 48]
+warmup_epoch_range = [6, 48]
 # _, n_epochs_kl_warmup = warmup_epoch_range
 n_epochs_kl_warmup = 400
 
@@ -51,7 +53,7 @@ disentenglement_targets_configurations=[
                 target_type="pseudo_categorical",
                 non_categorical_coefficient_method="squared_difference",
                 progress_bar = True,
-                weight = 200,
+                weight = 100,
                 method = "mse_z", 
                 latent_group = "reserved",
                 counteractive_example = "negative",
@@ -63,7 +65,69 @@ disentenglement_targets_configurations=[
                 apply = True, 
                 target_type="categorical",
                 progress_bar = True,
-                weight = 20, 
+                weight = 10, 
+                method = "mse_z", 
+                latent_group = "reserved",
+                counteractive_example = "positive",
+                transformation = "none",
+                warmup_epoch_range=warmup_epoch_range,
+                method_kwargs = {}
+            ),
+        ]
+    ),
+    dict(
+        obs_key = "integration_donor",
+        n_reserved_latent = 8,
+        counteractive_minibatch_settings = counteractive_minibatch_settings,
+        auxillary_losses = [
+            dict(
+                apply = True, 
+                target_type="categorical",
+                progress_bar = True,
+                weight = 100,
+                method = "mse_z", 
+                latent_group = "reserved",
+                counteractive_example = "negative",
+                transformation = "inverse", 
+                warmup_epoch_range=warmup_epoch_range,
+                method_kwargs = {}
+            ),
+            dict(
+                apply = True, 
+                target_type="categorical",
+                progress_bar = False,
+                weight = 10, 
+                method = "mse_z", 
+                latent_group = "reserved",
+                counteractive_example = "positive",
+                transformation = "none",
+                warmup_epoch_range=warmup_epoch_range,
+                method_kwargs = {}
+            ),
+        ]
+    ),
+    dict(
+        obs_key = "integration_library_platform_coarse",
+        n_reserved_latent = 8,
+        counteractive_minibatch_settings = counteractive_minibatch_settings,
+        auxillary_losses = [
+            dict(
+                apply = True, 
+                target_type="categorical",
+                progress_bar = True,
+                weight = 100,
+                method = "mse_z", 
+                latent_group = "reserved",
+                counteractive_example = "negative",
+                transformation = "inverse", 
+                warmup_epoch_range=warmup_epoch_range,
+                method_kwargs = {}
+            ),
+            dict(
+                apply = True, 
+                target_type="categorical",
+                progress_bar = False,
+                weight = 10, 
                 method = "mse_z", 
                 latent_group = "reserved",
                 counteractive_example = "positive",
@@ -78,7 +142,7 @@ disentenglement_targets_configurations=[
 model_params = dict(
     n_hidden=512,
     n_layers=3, 
-    n_latent=32, 
+    n_latent=48, 
     gene_likelihood = "nb",
     use_batch_norm = "none",
     use_layer_norm = "both",
@@ -106,8 +170,8 @@ train_params = dict(
         lr_patience=100,
         lr_scheduler_metric="elbo_train",
     ),
-    limit_train_batches=0.5, 
-    limit_val_batches=0.5,
+    limit_train_batches=0.25, 
+    limit_val_batches=0.25,
 )
 
 dataset_params = dict(

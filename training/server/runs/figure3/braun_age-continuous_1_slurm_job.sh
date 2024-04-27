@@ -10,5 +10,5 @@
 #SBATCH -t 1-23:50:00
 
 source activate tardis_env
-python /home/icb/kemal.inecik/work/codes/tardis/training/server/runs/figure3/sciplex-cpa_age_dose-continuous_2.4.py
+python /home/icb/kemal.inecik/work/codes/tardis/training/server/runs/figure3/braun_age-continuous_1.py
 

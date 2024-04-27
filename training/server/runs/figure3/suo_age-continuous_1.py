@@ -21,19 +21,12 @@ import tardis
 tardis.config = tardis.config_server
 print(f"CUDA used: {torch.cuda.is_available()}")
 
-adata_file_path = os.path.join(tardis.config.io_directories["processed"], "cpa_GSM_new.h5ad")
+adata_file_path = os.path.join(tardis.config.io_directories["processed"], "dataset_complete_Suo.h5ad")
 assert os.path.isfile(adata_file_path), f"File not already exist: `{adata_file_path}`"
 adata = ad.read_h5ad(adata_file_path)
+adata.obs["age"] = adata.obs["age"].astype("str").astype("category")
 
-adata.X = adata.layers["counts"].copy()
-del adata.layers
-adata.obs.loc[adata.obs["dose"] == "0.0", "dose_val"] = 0.0
-d = {i: ind for ind, i in enumerate(sorted(adata.obs["dose"].astype(float).unique()))}
-adata.obs["dose_training"] = [d[float(i)] for i in adata.obs["dose"]]
-gc.collect()
-
-
-warmup_epoch_range = [8, 40]
+warmup_epoch_range = [6, 48]
 # _, n_epochs_kl_warmup = warmup_epoch_range
 n_epochs_kl_warmup = 400
 
@@ -49,14 +42,45 @@ counteractive_minibatch_settings = dict(
 
 disentenglement_targets_configurations=[
     dict(
-        obs_key = "dose_training",
+        obs_key = "age",
         n_reserved_latent = 8,
         counteractive_minibatch_settings = counteractive_minibatch_settings,
         auxillary_losses = [
             dict(
                 apply = True, 
                 target_type="pseudo_categorical",
-                non_categorical_coefficient_method="absolute_difference",
+                non_categorical_coefficient_method="squared_difference",
+                progress_bar = True,
+                weight = 100,
+                method = "mse_z", 
+                latent_group = "reserved",
+                counteractive_example = "negative",
+                transformation = "inverse", 
+                warmup_epoch_range=warmup_epoch_range,
+                method_kwargs = {}
+            ),
+            dict(
+                apply = True, 
+                target_type="categorical",
+                progress_bar = True,
+                weight = 10, 
+                method = "mse_z", 
+                latent_group = "reserved",
+                counteractive_example = "positive",
+                transformation = "none",
+                warmup_epoch_range=warmup_epoch_range,
+                method_kwargs = {}
+            ),
+        ]
+    ),
+    dict(
+        obs_key = "integration_donor",
+        n_reserved_latent = 8,
+        counteractive_minibatch_settings = counteractive_minibatch_settings,
+        auxillary_losses = [
+            dict(
+                apply = True, 
+                target_type="categorical",
                 progress_bar = True,
                 weight = 100,
                 method = "mse_z", 
@@ -70,7 +94,7 @@ disentenglement_targets_configurations=[
                 apply = True, 
                 target_type="categorical",
                 progress_bar = False,
-                weight = 40, 
+                weight = 10, 
                 method = "mse_z", 
                 latent_group = "reserved",
                 counteractive_example = "positive",
@@ -81,7 +105,7 @@ disentenglement_targets_configurations=[
         ]
     ),
     dict(
-        obs_key = "condition",
+        obs_key = "integration_library_platform_coarse",
         n_reserved_latent = 8,
         counteractive_minibatch_settings = counteractive_minibatch_settings,
         auxillary_losses = [
@@ -116,7 +140,7 @@ disentenglement_targets_configurations=[
 model_params = dict(
     n_hidden=512,
     n_layers=3, 
-    n_latent=40, 
+    n_latent=48, 
     gene_likelihood = "nb",
     use_batch_norm = "none",
     use_layer_norm = "both",
@@ -131,7 +155,7 @@ train_params = dict(
     check_val_every_n_epoch=10,
     learning_rate_monitor=True,
     # early stopping:
-    early_stopping=True,
+    early_stopping=False,
     early_stopping_patience=150,
     early_stopping_monitor="elbo_train",
     plan_kwargs = dict(
@@ -143,13 +167,15 @@ train_params = dict(
         reduce_lr_on_plateau=True,
         lr_patience=100,
         lr_scheduler_metric="elbo_train",
-    )
+    ),
+    limit_train_batches=0.25, 
+    limit_val_batches=0.25,
 )
 
 dataset_params = dict(
     layer=None, 
-    labels_key=None,
-    batch_key=None,
+    labels_key="cell_type",
+    batch_key="concatenated_integration_covariates",
     categorical_covariate_keys=None,
     disentenglement_targets_configurations=disentenglement_targets_configurations
 )
@@ -170,11 +196,10 @@ vae.train(**train_params)
 
 dir_path = os.path.join(
     tardis.config.io_directories["models"],
-    "sciplex-cpa_age_dose-continuous_2.3"
+    "suo_age-continuous_1"
 )
 
 vae.save(
     dir_path,
     overwrite=True,
 )
-
