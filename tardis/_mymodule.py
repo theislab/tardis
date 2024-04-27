@@ -19,6 +19,10 @@ from ._myconstants import (
     WEIGHTED_LOSS_SUFFIX,
     minified_method_not_supported_message,
 )
+from scvi.nn import one_hot
+from scvi.distributions import NegativeBinomial, Poisson, ZeroInflatedNegativeBinomial
+from torch.distributions import Normal
+import torch.nn.functional as F
 
 torch.backends.cudnn.benchmark = True
 
@@ -67,6 +71,93 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
 
     def _regular_inference(self, *args, **kwargs):
         raise NotImplementedError(minified_method_not_supported_message)
+
+    @auto_move_data
+    def generative(
+        self,
+        z,
+        library,
+        batch_index,
+        cont_covs=None,
+        cat_covs=None,
+        size_factor=None,
+        y=None,
+        transform_batch=None,
+    ):
+        if cont_covs is None:
+            decoder_input = z
+        elif z.dim() != cont_covs.dim():
+            decoder_input = torch.cat(
+                [z, cont_covs.unsqueeze(0).expand(z.size(0), -1, -1)], dim=-1
+            )
+        else:
+            decoder_input = torch.cat([z, cont_covs], dim=-1)
+
+        if cat_covs is not None:
+            ### TARDIS: TEMPORARY SOLUTION
+            raise NotImplementedError("Tardis temp solution didn't consider this case yet.")
+            categorical_input = torch.split(cat_covs, 1, dim=1)
+        else:
+            categorical_input = ()
+
+        if transform_batch is not None:
+            batch_index = torch.ones_like(batch_index) * transform_batch
+            ### TARDIS: TEMPORARY SOLUTION
+            batch_index = torch.zeros_like(batch_index)
+
+        if not self.use_size_factor_key:
+            size_factor = library
+
+        px_scale, px_r, px_rate, px_dropout = self.decoder(
+            self.dispersion,
+            decoder_input,
+            size_factor,
+            ### TARDIS: TEMPORARY SOLUTION
+            # batch_index,
+            torch.zeros_like(batch_index),
+            *categorical_input,
+            y,
+        )
+        
+        if self.dispersion == "gene-label":
+            px_r = F.linear(
+                one_hot(y, self.n_labels), self.px_r
+            )  # px_r gets transposed - last dimension is nb genes
+        elif self.dispersion == "gene-batch":
+            px_r = F.linear(one_hot(batch_index, self.n_batch), self.px_r)
+            raise NotImplementedError("Tardis temp solution didn't consider this case yet.")
+        elif self.dispersion == "gene":
+            px_r = self.px_r
+
+        px_r = torch.exp(px_r)
+
+        if self.gene_likelihood == "zinb":
+            px = ZeroInflatedNegativeBinomial(
+                mu=px_rate,
+                theta=px_r,
+                zi_logits=px_dropout,
+                scale=px_scale,
+            )
+        elif self.gene_likelihood == "nb":
+            px = NegativeBinomial(mu=px_rate, theta=px_r, scale=px_scale)
+        elif self.gene_likelihood == "poisson":
+            px = Poisson(px_rate, scale=px_scale)
+
+        # Priors
+        if self.use_observed_lib_size:
+            pl = None
+        else:
+            (
+                local_library_log_means,
+                local_library_log_vars,
+            ) = self._compute_local_library_params(batch_index)
+            pl = Normal(local_library_log_means, local_library_log_vars.sqrt())
+        pz = Normal(torch.zeros_like(z), torch.ones_like(z))
+        return {
+            "px": px,
+            "pl": pl,
+            "pz": pz,
+        }
 
     def _get_inference_input(
         self,

@@ -34,13 +34,13 @@ while true; do
 
     # Execute the corresponding command based on the user's choice
     case $choice in
-        1) rclone sync -v --progress -L "$SERVER_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}"
+        1) rclone sync -v --progress -L "$SERVER_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}"  --exclude '*_temporary/**'
            ;;
         2) rclone sync -v --progress "$LOCAL_DATA_PATH" "$DRIVE_DATA_PATH" "${COMMON_EXCLUDES[@]}" --exclude '*_temporary/**'
            ;;
         3) rclone sync -v --progress "$DRIVE_DATA_PATH" "$LOCAL_DATA_PATH" "${COMMON_EXCLUDES[@]}" --exclude '*_temporary/**'
            ;;
-        4) rclone sync -v --progress "$DRIVE_DATA_PATH" "$SERVER_DATA_PATH" "${COMMON_EXCLUDES[@]}"
+        4) rclone sync -v --progress "$DRIVE_DATA_PATH" "$SERVER_DATA_PATH" "${COMMON_EXCLUDES[@]}"  --exclude '*_temporary/**'
            ;;
         5) rclone sync -v --progress "$REPO_PATH" "$DRIVE_REPO_PATH" "${COMMON_EXCLUDES[@]}" \
             --exclude '/data/**'

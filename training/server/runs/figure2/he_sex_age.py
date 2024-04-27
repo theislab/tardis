@@ -26,7 +26,7 @@ assert os.path.isfile(adata_file_path), f"File not already exist: `{adata_file_p
 adata = ad.read_h5ad(adata_file_path)
 adata.obs["age"] = adata.obs["age"].astype("str").astype("category")
 
-warmup_epoch_range = [12, 48]
+warmup_epoch_range = [6, 48]
 # _, n_epochs_kl_warmup = warmup_epoch_range
 n_epochs_kl_warmup = 400
 
@@ -102,13 +102,44 @@ disentenglement_targets_configurations=[
                 method_kwargs = {}
             ),
         ]
+    ),
+    dict(
+        obs_key = "integration_donor",
+        n_reserved_latent = 8,
+        counteractive_minibatch_settings = counteractive_minibatch_settings,
+        auxillary_losses = [
+            dict(
+                apply = True, 
+                target_type="categorical",
+                progress_bar = True,
+                weight = 100,
+                method = "mse_z", 
+                latent_group = "reserved",
+                counteractive_example = "negative",
+                transformation = "inverse", 
+                warmup_epoch_range=warmup_epoch_range,
+                method_kwargs = {}
+            ),
+            dict(
+                apply = True, 
+                target_type="categorical",
+                progress_bar = False,
+                weight = 10, 
+                method = "mse_z", 
+                latent_group = "reserved",
+                counteractive_example = "positive",
+                transformation = "none",
+                warmup_epoch_range=warmup_epoch_range,
+                method_kwargs = {}
+            ),
+        ]
     )
 ]
 
 model_params = dict(
     n_hidden=512,
     n_layers=3, 
-    n_latent=40, 
+    n_latent=48, 
     gene_likelihood = "nb",
     use_batch_norm = "none",
     use_layer_norm = "both",
@@ -123,7 +154,7 @@ train_params = dict(
     check_val_every_n_epoch=10,
     learning_rate_monitor=True,
     # early stopping:
-    early_stopping=True,
+    early_stopping=False,
     early_stopping_patience=150,
     early_stopping_monitor="elbo_train",
     plan_kwargs = dict(
