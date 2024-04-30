@@ -18,7 +18,7 @@ class ModelLevelMetrics:
 
     @classmethod
     def _add(cls, metric_settings):
-                
+
         if not isinstance(metric_settings["every_n_epoch"], int):
             raise ValueError
         if not isinstance(metric_settings["subsample"], float):
@@ -29,22 +29,25 @@ class ModelLevelMetrics:
             raise ValueError
         if not isinstance(metric_settings["progress_bar"], bool):
             raise ValueError
+        if not isinstance(metric_settings["metric_kwargs"], dict):
+            raise ValueError
         if not all([i in cls._training_sets for i in metric_settings["training_set"]]):
             raise ValueError
-        
+
         for training_set in metric_settings["training_set"]:
             if metric_settings["metric_identifier"] in cls.items[training_set]:
                 raise ValueError
             cls.items[training_set][metric_settings["metric_identifier"]] = {
                 "every_n_epoch": metric_settings["every_n_epoch"],
                 "subsample": metric_settings["subsample"],
+                "metric_kwargs": metric_settings["metric_kwargs"],
             }
-        
+
         if metric_settings["progress_bar"]:
             if metric_settings["metric_identifier"] in ProgressBarManager.keys:
                 raise ValueError
             ProgressBarManager.add(metric_name=metric_settings["metric_identifier"])
-        
+
     @classmethod
     def add(cls, definitions_dict_list):
         for defs in definitions_dict_list:

@@ -14,6 +14,13 @@ def isnumeric(s):
         return False
 
 
+def create_random_mask(shape, ratio_true, seed=None):
+    rng = np.random.default_rng(seed)
+    random_floats = rng.random(shape)
+    mask = random_floats < ratio_true
+    return mask
+
+
 def categorical_covariate_validator(n1: list[str] | None, n2: list[str] | None):
     n1 = n1 if n1 is not None else []
     n2 = n2 if n2 is not None else []

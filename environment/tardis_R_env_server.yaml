@@ -85,7 +85,7 @@ dependencies:
   - r-rdpack
   - r-pacman
   - r-spatstat
-  - r-mlpack 
+  - r-mlpack
   - bioconda::bioconductor-biomart
   - bioconda::bioconductor-mygene
   - bioconda::bioconductor-basilisk
@@ -97,4 +97,3 @@ dependencies:
   - bioconda::bioconductor-singlecellexperiment
   - bioconda::r-anndata
   - bioconda::r-seurat-data
-

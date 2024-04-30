@@ -3,6 +3,7 @@
 from ._utils.preprocessing import NA_CELL_TYPE_PLACEHOLDER, RANK_GENES_GROUPS_KEY  # noqa
 
 MODEL_NAME = "tardis"
+REGISTRY_KEY_METRICS_COVARIATES_HELPER = "metrics_helper"
 REGISTRY_KEY_DISENTANGLEMENT_TARGETS = "disentanglement_target"
 REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS = "disentanglement_target_tensors"
 

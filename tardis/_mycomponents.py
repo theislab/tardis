@@ -5,17 +5,18 @@ from collections.abc import Iterable
 from typing import Literal
 
 import torch
-from torch import nn
 from scvi.nn import FCLayers
 from scvi.nn._utils import one_hot
+from torch import nn
+
 
 class FCLayersReservedLatentInjection(FCLayers):
-    
+
     def __init__(
         self,
         n_in: int,
         n_out: int,
-        n_reserved: int, # additional
+        n_reserved: int,  # additional
         n_cat_list: Iterable[int] = None,
         n_layers: int = 1,
         n_hidden: int = 128,
@@ -28,18 +29,18 @@ class FCLayersReservedLatentInjection(FCLayers):
         activation_fn: nn.Module = nn.ReLU,
     ):
         super().__init__(
-            n_in=n_in, 
-            n_out=n_out, 
-            n_cat_list=n_cat_list, 
-            n_layers=n_layers, 
-            n_hidden=n_hidden, 
-            dropout_rate=dropout_rate, 
-            use_batch_norm=use_batch_norm, 
-            use_layer_norm=use_layer_norm, 
-            use_activation=use_activation, 
-            bias=bias, 
-            inject_covariates=inject_covariates, 
-            activation_fn=activation_fn
+            n_in=n_in,
+            n_out=n_out,
+            n_cat_list=n_cat_list,
+            n_layers=n_layers,
+            n_hidden=n_hidden,
+            dropout_rate=dropout_rate,
+            use_batch_norm=use_batch_norm,
+            use_layer_norm=use_layer_norm,
+            use_activation=use_activation,
+            bias=bias,
+            inject_covariates=inject_covariates,
+            activation_fn=activation_fn,
         )
         self.inject_covariates = inject_covariates
         layers_dim = [n_in] + (n_layers - 1) * [n_hidden] + [n_out]
@@ -63,12 +64,8 @@ class FCLayersReservedLatentInjection(FCLayers):
                                 bias=bias,
                             ),
                             # non-default params come from defaults in original Tensorflow implementation
-                            nn.BatchNorm1d(n_out, momentum=0.01, eps=0.001)
-                            if use_batch_norm
-                            else None,
-                            nn.LayerNorm(n_out, elementwise_affine=False)
-                            if use_layer_norm
-                            else None,
+                            nn.BatchNorm1d(n_out, momentum=0.01, eps=0.001) if use_batch_norm else None,
+                            nn.LayerNorm(n_out, elementwise_affine=False) if use_layer_norm else None,
                             activation_fn() if use_activation else None,
                             nn.Dropout(p=dropout_rate) if dropout_rate > 0 else None,
                         ),
@@ -77,7 +74,7 @@ class FCLayersReservedLatentInjection(FCLayers):
                 ]
             )
         )
-    
+
     def forward(self, x: torch.Tensor, reserved_latent_injection: torch.Tensor, *cat_list: int):
         one_hot_cat_list = []  # for generality in this list many indices useless.
 
@@ -104,8 +101,7 @@ class FCLayersReservedLatentInjection(FCLayers):
                         if isinstance(layer, nn.Linear) and self.inject_into_layer(i):
                             if x.dim() == 3:
                                 one_hot_cat_list_layer = [
-                                    o.unsqueeze(0).expand((x.size(0), o.size(0), o.size(1)))
-                                    for o in one_hot_cat_list
+                                    o.unsqueeze(0).expand((x.size(0), o.size(0), o.size(1))) for o in one_hot_cat_list
                                 ]
                             else:
                                 one_hot_cat_list_layer = one_hot_cat_list
@@ -140,13 +136,14 @@ class FCLayersReservedLatentInjection(FCLayers):
                     b = layer.bias.register_hook(_hook_fn_zero_out)
                     self.hooks.append(b)
 
+
 class DecoderSCVIReservedLatentInjection(nn.Module):
-    
+
     def __init__(
         self,
         n_input: int,
         n_output: int,
-        n_reserved: int, 
+        n_reserved: int,
         n_cat_list: Iterable[int] = None,
         n_layers: int = 1,
         n_hidden: int = 128,
@@ -193,8 +190,8 @@ class DecoderSCVIReservedLatentInjection(nn.Module):
         z: torch.Tensor,
         library: torch.Tensor,
         *cat_list: int,
-        reserved_latent_injection: torch.Tensor
-    ):        
+        reserved_latent_injection: torch.Tensor,
+    ):
         # The decoder returns values for the parameters of the ZINB distribution
         px = self.px_decoder(z, reserved_latent_injection, *cat_list)
         px_scale = self.px_scale_decoder(px)

@@ -27,7 +27,7 @@ from ._disentanglement import Disentanglements
 from ._disentanglementmanager import DisentanglementManager
 from ._metricsmixin import MetricsMixin
 from ._modelplotting import ModelPlotting
-from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTANGLEMENT_TARGETS
+from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTANGLEMENT_TARGETS, REGISTRY_KEY_METRICS_COVARIATES_HELPER
 from ._mymodule import MyModule
 from ._mymonitor import (
     AuxillaryLossWarmupManager,
@@ -100,6 +100,7 @@ class MyModel(
         continuous_covariate_keys: list[str] | None = None,
         disentenglement_targets_configurations: list[dict] | None = None,
         model_level_metrics: list[dict] | None = None,
+        model_level_metrics_helper_covariates: list[str] | None = None,
         **kwargs,
     ):
         setup_method_args = cls._get_setup_method_args(**locals())
@@ -112,10 +113,7 @@ class MyModel(
         CachedPossibleGroupDefinitionIndices.reset()
         ModelLevelMetrics.reset()
 
-        if model_level_metrics is None:
-            model_level_metrics = []
-        ModelLevelMetrics.add(model_level_metrics)
-
+        ModelLevelMetrics.add(model_level_metrics if model_level_metrics is not None else [])
         if disentenglement_targets_configurations is None:
             disentenglement_targets_configurations = []
         # This also checks whether the dict follows the format required.
@@ -133,6 +131,7 @@ class MyModel(
             CategoricalJointObsField(REGISTRY_KEYS.CAT_COVS_KEY, categorical_covariate_keys),
             NumericalJointObsField(REGISTRY_KEYS.CONT_COVS_KEY, continuous_covariate_keys),
             CategoricalJointObsField(REGISTRY_KEY_DISENTANGLEMENT_TARGETS, disentenglement_targets_setup_anndata_keys),
+            CategoricalJointObsField(REGISTRY_KEY_METRICS_COVARIATES_HELPER, model_level_metrics_helper_covariates),
         ]
         adata_minify_type = _get_adata_minify_type(adata)
         assert adata_minify_type is None, f"{MODEL_NAME} model currently does not support minified data."
