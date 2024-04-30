@@ -68,6 +68,12 @@ class MyModel(
             if REGISTRY_KEYS.CAT_COVS_KEY in self.adata_manager.data_registry
             else None
         )
+        n_cats_per_disentenglement_covariates = (
+            self.adata_manager.get_state_registry(REGISTRY_KEY_DISENTANGLEMENT_TARGETS).n_cats_per_key
+            if REGISTRY_KEY_DISENTANGLEMENT_TARGETS in self.adata_manager.data_registry
+            else None
+        )
+        
         n_batch = self.summary_stats.n_batch
         use_size_factor_key = REGISTRY_KEYS.SIZE_FACTOR_KEY in self.adata_manager.data_registry
         library_log_means, library_log_vars = None, None
@@ -83,6 +89,7 @@ class MyModel(
             use_size_factor_key=use_size_factor_key,
             library_log_means=library_log_means,
             library_log_vars=library_log_vars,
+            n_cats_per_disentenglement_covariates=n_cats_per_disentenglement_covariates,
             **kwargs,
         )
 

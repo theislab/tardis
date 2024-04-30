@@ -10,7 +10,7 @@ from scipy.sparse import spmatrix
 from scvi import REGISTRY_KEYS, settings
 
 from ._disentanglementmanager import DisentanglementManager
-from ._myconstants import NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY, REGISTRY_KEY_DISENTANGLEMENT_TARGETS
+from ._myconstants import NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY, REGISTRY_KEY_DISENTANGLEMENT_TARGETS, REGISTRY_KEY_METRICS_COVARIATES_HELPER
 from ._mymonitor import TrainingStepLogger
 
 
@@ -86,6 +86,7 @@ class CachedPossibleGroupDefinitionIndices:
         )
         possible_keys = {j for i in known_keys for j in known_keys[i]}
         possible_keys.add(REGISTRY_KEYS.CAT_COVS_KEY)  # will be used if provided but not must-have or warning-raising.
+        possible_keys.add(REGISTRY_KEY_METRICS_COVARIATES_HELPER)
 
         for must_have_key in known_keys["must_have_keys"]:
             if must_have_key not in dataset_tensors_keys:

@@ -2,7 +2,7 @@
 
 wandblogger_kwargs:
   entity: inecik-academic
-  project: tardis_exploration_runs
+  project: tardis_figures
   name: null # wandb should assign a random one
   save_dir:
     relative_to: wandb_parent_directory
@@ -10,8 +10,10 @@ wandblogger_kwargs:
   mode: online
   tags:
     - tardis
-    - exploration
+    - conference
+    - figures
+    - final
   offline: True
   save_code: False
   resume: never
-  notes: Development runs for tardis.
+  notes: Final runs for Tardis before conference.

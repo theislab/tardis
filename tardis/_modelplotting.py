@@ -85,9 +85,16 @@ class ModelPlotting:
                         fig.delaxes(ax)
                         continue
                     ax.plot(_ignore_first(train_data, ignore_first), **train_kwargs)
-                    if validatation_calculated:
-                        ax.plot(_ignore_first(valid_data, ignore_first), **valid_kwargs)
-                        ax.legend(fontsize=8)
+                    try:
+                        if validatation_calculated:
+                            ax.plot(_ignore_first(valid_data, ignore_first), **valid_kwargs)
+                            ax.legend(fontsize=8)
+                    except KeyError:
+                        warnings.warn(
+                            message=f"Validation is not calculated during training for `{title_str}`.",
+                            category=UserWarning,
+                            stacklevel=settings.warnings_stacklevel,
+                        )
                     sns.despine(ax=ax, top=True, right=True, left=False, bottom=False, offset=None, trim=False)
                     ax.set_title(title_str, fontsize=10)
 

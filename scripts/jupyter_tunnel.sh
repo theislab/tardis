@@ -35,6 +35,17 @@ REMOTE_USER="kemal.inecik"
 REMOTE_HOST="hpc-build01"
 LOCAL_PORT="10121"
 
+# Function to check if the port is in use and increment if necessary
+function check_port {
+    while lsof -i :$LOCAL_PORT &>/dev/null; do
+        log "Port $LOCAL_PORT is in use, trying next one."
+        ((LOCAL_PORT++))
+    done
+}
+
+# Check and adjust the local port if necessary
+check_port
+
 # Build the SSH command
 sshpass_command="sshpass -p '$password_icb'"
 ssh_command="ssh -t -o LogLevel=error -L $LOCAL_PORT:$hostname:$jupyter_port $REMOTE_USER@$REMOTE_HOST"
