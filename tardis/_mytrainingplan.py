@@ -7,24 +7,26 @@ from scvi.module.base import LossOutput
 from scvi.train import TrainingPlan
 from scvi.train._metrics import ElboMetric
 
-from ._mymonitor import ProgressBarManager, TrainingEpochLogger, TrainingStepLogger
-
+from ._mymonitor import ProgressBarManager, TrainingEpochLogger, TrainingStepLogger, ModelLevelMetrics
+from ._metricsmixin import MetricsMixin
 
 class MyTrainingPlan(TrainingPlan):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        self.train_step_outputs: dict
+        self.validation_step_outputs: dict
+        self.train_model_level_metric_switch: bool
+        self.validation_model_level_metric_switch: bool
+        self._reset_step_outputs(mode="train")
+        self._reset_step_outputs(mode="validation")
 
     def forward(self, *args, **kwargs):
         TrainingStepLogger.set_step(key="gglobal", value=copy.deepcopy(self.global_step))
         TrainingEpochLogger.set_epoch(key="current", value=self.current_epoch)
         TrainingStepLogger.increment_step(key="forward")
         return self.module(*args, **kwargs)
-
-    def training_step(self, *args, **kwargs):
-        TrainingStepLogger.increment_step(key="training")
-        return super().training_step(*args, **kwargs)
-
-    def validation_step(self, *args, **kwargs):
-        TrainingStepLogger.increment_step(key="validation")
-        return super().validation_step(*args, **kwargs)
 
     def test_step(self, *args, **kwargs):
         TrainingStepLogger.increment_step(key="test")
@@ -34,15 +36,66 @@ class MyTrainingPlan(TrainingPlan):
         TrainingStepLogger.increment_step(key="predict")
         return super().predict_step(*args, **kwargs)
 
-    def is_key_should_be_in_progress_bar(self, key_with_mode, mode):
-        key, _ = key_with_mode.rsplit(f"_{mode}", 1)
-        if len(key) == 0:
-            raise ValueError("Key cannot be empty")
+    def _combine_step_outputs(self, mode):
+        if mode == "train":
+            return {i: torch.stack(v).cpu().numpy() for i, v in self.train_step_outputs.items()}
+        elif mode == "validation":
+            return {i: torch.stack(v).cpu().numpy() for i, v in self.validation_step_outputs.items()}
 
-        if key in ProgressBarManager.keys and mode in ProgressBarManager.modes:
-            return True
+    def _reset_step_outputs(self, mode):
+        if mode == "train":
+            self.train_step_outputs = {"t1": [], "t2": []}
+        elif mode == "validation":
+            self.validation_step_outputs = {"t1": [], "t2": []}
+        else:
+            raise ValueError
 
-        return False
+    def _calculate_model_level_metrics(self, mode):
+        step_outputs = self._combine_step_outputs(mode=mode)
+        
+        for metric_identifier, metric_settings in ModelLevelMetrics.items[mode].items():
+            # subsample using metric_settings["subsample"]
+            # if else statement for the metric, using staticmethos in the metricsmixin
+            if metric_identifier == "demo":
+                metric = MetricsMixin.get_demo_metric(
+                    t1=step_outputs["t1"],
+                    t2=step_outputs["t2"]
+                )
+            else:
+                raise NotImplementedError
+            
+            self.log(
+                name=f"{metric_identifier}_{mode}",
+                value=metric,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=self.is_key_should_be_in_progress_bar(f"{metric_identifier}_{mode}", mode),
+                sync_dist=self.use_sync_dist,
+            )
+
+    def on_train_epoch_end(self) -> None:
+        if not self.train_model_level_metric_switch:
+            return
+        self._calculate_model_level_metrics(mode="train")
+        self._reset_step_outputs(mode="train")
+
+    def on_validation_epoch_end(self) -> None:
+        if not self.validation_model_level_metric_switch:
+            return
+        self._calculate_model_level_metrics(mode="validation")
+        self._reset_step_outputs(mode="validation")
+
+    def on_train_epoch_start(self) -> None:
+        self.train_model_level_metric_switch = False
+        for _, metric_settings in ModelLevelMetrics.items["train"].items():
+            if (self.current_epoch + 1) % metric_settings["every_n_epoch"] == 0:
+                self.train_model_level_metric_switch = True
+                
+    def on_validation_epoch_start(self) -> None:
+        self.validation_model_level_metric_switch = False
+        for _, metric_settings in ModelLevelMetrics.items["validation"].items():
+            if (self.current_epoch + 1) % metric_settings["every_n_epoch"] == 0:
+                self.validation_model_level_metric_switch = True
 
     def training_step(self, batch, batch_idx):  # noqa
         if "kl_weight" in self.loss_kwargs:
@@ -50,12 +103,23 @@ class MyTrainingPlan(TrainingPlan):
             self.loss_kwargs.update({"kl_weight": kl_weight})
             self.log("kl_weight", kl_weight, on_step=True, on_epoch=False)
         _, _, scvi_loss = self.forward(batch, loss_kwargs=self.loss_kwargs)
-        self.compute_and_log_metrics(scvi_loss, self.train_metrics, "train")
+        self.compute_and_log_metrics(scvi_loss, self.train_metrics, mode="train")
+        TrainingStepLogger.increment_step(key="training")
+
+        if self.train_model_level_metric_switch:
+            self.train_step_outputs["t1"].append(torch.Tensor([1]).clone().detach())
+            self.train_step_outputs["t2"].append(torch.Tensor([3]).clone().detach())
+
         return scvi_loss.loss
 
     def validation_step(self, batch, batch_idx):  # noqa
         _, _, scvi_loss = self.forward(batch, loss_kwargs=self.loss_kwargs)
-        self.compute_and_log_metrics(scvi_loss, self.val_metrics, "validation")
+        self.compute_and_log_metrics(scvi_loss, self.val_metrics, mode="validation")
+        TrainingStepLogger.increment_step(key="validation")
+        
+        if self.validation_model_level_metric_switch:
+            self.validation_step_outputs["t1"].append(torch.Tensor([12]).clone().detach())
+            self.validation_step_outputs["t2"].append(torch.Tensor([33]).clone().detach())
 
     @torch.inference_mode()
     def compute_and_log_metrics(
@@ -125,3 +189,13 @@ class MyTrainingPlan(TrainingPlan):
                 batch_size=n_obs_minibatch,
                 sync_dist=self.use_sync_dist,
             )
+
+    def is_key_should_be_in_progress_bar(self, key_with_mode, mode):
+        key, _ = key_with_mode.rsplit(f"_{mode}", 1)
+        if len(key) == 0:
+            raise ValueError("Key cannot be empty")
+
+        if key in ProgressBarManager.keys and mode in ProgressBarManager.modes:
+            return True
+
+        return False

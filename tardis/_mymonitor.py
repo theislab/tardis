@@ -7,6 +7,50 @@ import numpy as np
 from tardis._myconstants import PROGRESS_BAR_METRICS_KEYS, PROGRESS_BAR_METRICS_MODES
 
 
+class ModelLevelMetrics:
+
+    _training_sets = ["train", "validation"]
+    items: dict
+
+    @classmethod
+    def reset(cls):
+        cls.items = {i: dict() for i in cls._training_sets}
+
+    @classmethod
+    def _add(cls, metric_settings):
+                
+        if not isinstance(metric_settings["every_n_epoch"], int):
+            raise ValueError
+        if not isinstance(metric_settings["subsample"], float):
+            raise ValueError
+        if not isinstance(metric_settings["metric_identifier"], str):
+            raise ValueError
+        if not isinstance(metric_settings["training_set"], list):
+            raise ValueError
+        if not isinstance(metric_settings["progress_bar"], bool):
+            raise ValueError
+        if not all([i in cls._training_sets for i in metric_settings["training_set"]]):
+            raise ValueError
+        
+        for training_set in metric_settings["training_set"]:
+            if metric_settings["metric_identifier"] in cls.items[training_set]:
+                raise ValueError
+            cls.items[training_set][metric_settings["metric_identifier"]] = {
+                "every_n_epoch": metric_settings["every_n_epoch"],
+                "subsample": metric_settings["subsample"],
+            }
+        
+        if metric_settings["progress_bar"]:
+            if metric_settings["metric_identifier"] in ProgressBarManager.keys:
+                raise ValueError
+            ProgressBarManager.add(metric_name=metric_settings["metric_identifier"])
+        
+    @classmethod
+    def add(cls, definitions_dict_list):
+        for defs in definitions_dict_list:
+            cls._add(defs)
+
+
 class TrainingEpochLogger:
     current: int
 
@@ -97,7 +141,7 @@ class AuxillaryLossWarmupManager:
         else:
             i, j = range_list
 
-        cls.items[key] = range_list
+        cls.items[key] = [i, j]
         cls._items_helper[key] = (np.arange(i, j + 1) - i) / (j + 1 - i)
 
     @classmethod

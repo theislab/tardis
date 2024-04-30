@@ -5,9 +5,10 @@ from __future__ import annotations
 import copy
 import logging
 import os
+import warnings
 
 from anndata import AnnData
-from scvi import REGISTRY_KEYS
+from scvi import REGISTRY_KEYS, settings
 from scvi.data import AnnDataManager
 from scvi.data._utils import _get_adata_minify_type
 from scvi.data.fields import (
@@ -28,8 +29,15 @@ from ._metricsmixin import MetricsMixin
 from ._modelplotting import ModelPlotting
 from ._myconstants import MODEL_NAME, REGISTRY_KEY_DISENTANGLEMENT_TARGETS
 from ._mymodule import MyModule
-from ._mymonitor import AuxillaryLossWarmupManager, ProgressBarManager, TrainingEpochLogger, TrainingStepLogger
+from ._mymonitor import (
+    AuxillaryLossWarmupManager,
+    ModelLevelMetrics,
+    ProgressBarManager,
+    TrainingEpochLogger,
+    TrainingStepLogger,
+)
 from ._mytrainingmixin import MyUnsupervisedTrainingMixin
+from ._utils.functions import categorical_covariate_validator
 from ._utils.wandb import check_wandb_configurations
 from ._utils.warnings import ignore_predetermined_warnings
 
@@ -91,6 +99,7 @@ class MyModel(
         categorical_covariate_keys: list[str] | None = None,
         continuous_covariate_keys: list[str] | None = None,
         disentenglement_targets_configurations: list[dict] | None = None,
+        model_level_metrics: list[dict] | None = None,
         **kwargs,
     ):
         setup_method_args = cls._get_setup_method_args(**locals())
@@ -101,6 +110,11 @@ class MyModel(
         ProgressBarManager.reset()
         DisentanglementManager.reset()
         CachedPossibleGroupDefinitionIndices.reset()
+        ModelLevelMetrics.reset()
+
+        if model_level_metrics is None:
+            model_level_metrics = []
+        ModelLevelMetrics.add(model_level_metrics)
 
         if disentenglement_targets_configurations is None:
             disentenglement_targets_configurations = []
@@ -109,6 +123,7 @@ class MyModel(
 
         _dtsak = disentenglement_targets_configurations.get_ordered_obs_key()
         disentenglement_targets_setup_anndata_keys = _dtsak if len(_dtsak) > 0 else None
+        categorical_covariate_validator(categorical_covariate_keys, disentenglement_targets_setup_anndata_keys)
 
         anndata_fields = [
             LayerField(REGISTRY_KEYS.X_KEY, layer, is_count_data=True),
@@ -133,6 +148,22 @@ class MyModel(
                 if registry_key != REGISTRY_KEYS.X_KEY
             }
         )
+
+        if disentenglement_targets_setup_anndata_keys is not None and (
+            batch_key is not None or categorical_covariate_keys is not None
+        ):
+            warnings.warn(
+                message=(
+                    f"`{batch_key, categorical_covariate_keys}` is defined as `batch_key` or "
+                    "`categorical_covariate`, it will be given to both encoder and decoder. "
+                    "Make sure this does not contain information of any of your disentenglement targets. For "
+                    "example, if `donor_id` is chosen as a batch key, do not disentengle donor level information "
+                    "such as `sex` or `age`. The decoder should not use the disentengled latent spaces, simply "
+                    "ignores, if it is already given a batch_key. "
+                ),
+                category=UserWarning,
+                stacklevel=settings.warnings_stacklevel,
+            )
 
     @classmethod
     def setup_wandb(

@@ -15,6 +15,7 @@ from anndata import AnnData
 from scvi import REGISTRY_KEYS
 from scvi.utils import unsupported_if_adata_minified
 
+from ._disentanglementmanager import DisentanglementManager as DM
 from ._myconstants import NA_CELL_TYPE_PLACEHOLDER, RANK_GENES_GROUPS_KEY
 
 logger = logging.getLogger(__name__)
@@ -248,18 +249,55 @@ class MetricsMixin:
 
         return np.mean(values)
 
+    def _get_training_data_indices(self):
+
+        return {"validation": self.validation_indices, "train": self.train_indices}
+
+    def _get_training_latent_indices(self, target_factor_key):
+
+        return {
+            "reserved": DM.configurations.get_by_obs_key(target_factor_key).reserved_latent_indices,
+            "unreserved": DM.configurations.get_by_obs_key(target_factor_key).unreserved_latent_indices,
+        }
+
+    def get_knn_purity_training(
+        self,
+        target_factor_key: str,
+        n_neighbors: int = 30,
+    ):
+
+        splits = self._get_training_data_indices()
+        latent_subsets = self._get_training_latent_indices(target_factor_key=target_factor_key)
+
+        results = dict()
+        for split_identifier, split in splits.items():
+            for latent_subset_identifier, latent_subset in latent_subsets.items():
+                results[(split_identifier, latent_subset_identifier)] = self.get_knn_purity(
+                    target_factor_key=target_factor_key,
+                    data_indices=split,
+                    latent_indices=latent_subset,
+                    n_neighbors=n_neighbors,
+                )
+
+        return results
+
     @torch.inference_mode()
     @unsupported_if_adata_minified
     def get_knn_purity(
         self,
-        labels_key: str,
+        target_factor_key: str,
+        n_neighbors: int,
         adata: Optional[AnnData] = None,
-        indices: Optional[Sequence[int]] = None,
-        n_neighbors: int = 30,
+        data_indices: Optional[Sequence[int]] = None,
+        latent_indices: Optional[Sequence[int]] = None,
     ) -> float:
         adata = self._validate_anndata(adata if adata is not None else self.adata_manager.adata)
-        data = self.get_latent_representation(adata=adata, indices=indices)
-        labels = adata.obs[labels_key].values.flatten()
+        data = self.get_latent_representation(adata=adata, indices=data_indices)
+        labels = adata.obs[target_factor_key].to_numpy().flatten()
+
+        data = data if latent_indices is None else data[:, latent_indices]
+        labels = labels if latent_indices is None else labels[data_indices]
+
         return MetricsMixin.get_knn_purity_precalculated(data=data, labels=labels, n_neighbors=n_neighbors)
 
     @staticmethod
@@ -267,7 +305,7 @@ class MetricsMixin:
         data: np.ndarray,
         labels: np.ndarray,
         # Number of nearest neighbors.
-        n_neighbors: int = 30,
+        n_neighbors: int,
     ) -> float:  # between zero and one.
         labels = sklearn.preprocessing.LabelEncoder().fit_transform(labels.ravel())
         nbrs = sklearn.neighbors.NearestNeighbors(n_neighbors=n_neighbors + 1).fit(data)
@@ -345,7 +383,7 @@ class MetricsMixin:
         return pd.qcut(data, q=bins, labels=False, duplicates="drop")
 
     @staticmethod
-    def get_MI_precalculated(data, factors, variation, discretization_bins):
+    def get_MI_precalculated(data, factors, variation, discretization_bins: int) -> list[float]:
         """Computes MIs score for a set of latent variables and their corresponding factors.
 
         :param data: A numpy array of shape (num_samples, num_latent_variables),
@@ -391,25 +429,48 @@ class MetricsMixin:
         target_factor_key: str,
         discretization_bins: int = 256,
         adata: Optional[AnnData] = None,
-        indices: Optional[Sequence[int]] = None,
+        latent_indices: Optional[Sequence[int]] = None,
+        data_indices: Optional[Sequence[int]] = None,
     ) -> float:
         adata = self._validate_anndata(adata if adata is not None else self.adata_manager.adata)
-        data = self.get_latent_representation(adata=adata, indices=indices)
+        data = self.get_latent_representation(adata=adata, indices=data_indices)
+        data = data if latent_indices is None else data[:, latent_indices]
 
-        factors = np.expand_dims(
-            sklearn.preprocessing.LabelEncoder().fit_transform(
-                adata.obs[target_factor_key].astype(str).values.flatten()
-            ),
-            axis=1,
+        factors = sklearn.preprocessing.LabelEncoder().fit_transform(
+            adata.obs[target_factor_key].astype(str).values.flatten()
         )
+        factors = factors if data_indices is None else factors[data_indices]
+        factors = np.expand_dims(factors, axis=1)
         factors = np.broadcast_to(factors, (factors.shape[0], self.module.n_latent))
 
-        return MetricsMixin.get_MI_precalculated(
-            data=data,
-            factors=factors,
-            variation="normalized",
-            discretization_bins=discretization_bins,
+        return np.array(
+            MetricsMixin.get_MI_precalculated(
+                data=data,
+                factors=factors,
+                variation="normalized",
+                discretization_bins=discretization_bins,
+            )
         )
+
+    def get_MI_normalized_training(
+        self, target_factor_key: str, discretization_bins: int = 256, reduce: callable = np.mean
+    ):
+        splits = self._get_training_data_indices()
+        latent_subsets = self._get_training_latent_indices(target_factor_key=target_factor_key)
+
+        results = dict()
+        for split_identifier, split in splits.items():
+            for latent_subset_identifier, latent_subset in latent_subsets.items():
+                results[(split_identifier, latent_subset_identifier)] = reduce(
+                    self.get_MI_normalized(
+                        target_factor_key=target_factor_key,
+                        discretization_bins=discretization_bins,
+                        data_indices=split,
+                        latent_indices=latent_subset,
+                    )
+                )
+
+        return results
 
     @staticmethod
     def get_uncertainty_precalculated(
@@ -446,6 +507,10 @@ class MetricsMixin:
 
         return uncertainties
 
+    @staticmethod
+    def get_demo_metric(t1, t2):
+        return t1.mean() + t2.mean()
+
     @torch.inference_mode()
     @unsupported_if_adata_minified
     def get_uncertainty(
@@ -461,5 +526,19 @@ class MetricsMixin:
         labels = adata.obs[target_factor_key].astype(str).values
 
         return MetricsMixin.get_uncertainty_precalculated(data=data, labels=labels, n_neighbors=n_neighbors)
+
+    def get_reconstruction_r2_training(self, top_n: list[int] = [2**5, 2**6], **method_kwargs):
+
+        if "adata" in method_kwargs:
+            raise ValueError("Default training AnnData should be used.")
+        splits = self._get_training_data_indices()
+
+        results = dict()
+        for split_identifier, split in splits.items():
+            for n in [0] + top_n:
+                results[(split_identifier, "total" if n == 0 else f"DEG-{n}")] = self.get_reconstruction_r2(
+                    indices=split, top_n_differentially_expressed_genes=n, **method_kwargs
+                )
+        return results
 
     # AWS, LISI etc for reserved and unreserved latent given label is the target metadata

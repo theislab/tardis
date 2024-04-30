@@ -153,6 +153,7 @@ class Disentanglements(BaseModel):
     items: List[Disentanglement] = []
     # unreserved by any of the configuration.
     unreserved_latent_indices: Optional[List[int]] = None
+    reserved_latent_indices: Optional[List[int]] = None
     # complete list of indices, simply range(n_latent)
     latent_indices: Optional[List[int]] = None
     # filled by __init__
@@ -164,6 +165,12 @@ class Disentanglements(BaseModel):
     def unreserved_latent_indices_must_undefined_before_init(cls, v):
         if v is not None:
             raise ValueError("`unreserved_latent_indices` should not be defined by the user.")
+        return v
+
+    @field_validator("reserved_latent_indices")
+    def reserved_latent_indices_must_undefined_before_init(cls, v):
+        if v is not None:
+            raise ValueError("`reserved_latent_indices` should not be defined by the user.")
         return v
 
     @field_validator("latent_indices")

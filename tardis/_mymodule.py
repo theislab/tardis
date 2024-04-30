@@ -2,27 +2,33 @@
 
 import logging
 import warnings
+from collections.abc import Iterable
+from typing import Callable, Literal, Optional
 
+import numpy as np
 import torch
+import torch.nn.functional as F
 from scvi import REGISTRY_KEYS, settings
+from scvi._types import Tunable
+from scvi.distributions import NegativeBinomial, Poisson, ZeroInflatedNegativeBinomial
 from scvi.module import VAE
 from scvi.module.base import LossOutput, auto_move_data
+from scvi.nn import one_hot
+from torch.distributions import Normal
 from torch.distributions import kl_divergence as kl
 
 from ._auxillarylossesmixin import AuxillaryLossesMixin
 from ._disentanglementmanager import DisentanglementManager
 from ._metricsmixin import ModuleMetricsMixin
+from ._mycomponents import DecoderSCVIReservedLatentInjection
 from ._myconstants import (
     AUXILLARY_LOSS_MEAN,
     LOSS_NAMING_DELIMITER,
+    REGISTRY_KEY_DISENTANGLEMENT_TARGETS,
     REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS,
     WEIGHTED_LOSS_SUFFIX,
     minified_method_not_supported_message,
 )
-from scvi.nn import one_hot
-from scvi.distributions import NegativeBinomial, Poisson, ZeroInflatedNegativeBinomial
-from torch.distributions import Normal
-import torch.nn.functional as F
 
 torch.backends.cudnn.benchmark = True
 
@@ -31,8 +37,65 @@ logger = logging.getLogger(__name__)
 
 class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
 
-    def __init__(self, *args, include_auxillary_loss: bool = True, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        n_input: int,
+        n_batch: int = 0,
+        n_labels: int = 0,
+        n_hidden: Tunable[int] = 128,
+        n_latent: Tunable[int] = 10,
+        n_layers: Tunable[int] = 1,
+        n_continuous_cov: int = 0,
+        n_cats_per_cov: Optional[Iterable[int]] = None,
+        dropout_rate: Tunable[float] = 0.1,
+        dispersion: Tunable[Literal["gene", "gene-batch", "gene-label", "gene-cell"]] = "gene",
+        log_variational: Tunable[bool] = True,
+        gene_likelihood: Tunable[Literal["zinb", "nb", "poisson"]] = "zinb",
+        latent_distribution: Tunable[Literal["normal", "ln"]] = "normal",
+        deeply_inject_covariates: Tunable[bool] = True,
+        use_batch_norm: Tunable[Literal["encoder", "decoder", "none", "both"]] = "both",
+        use_layer_norm: Tunable[Literal["encoder", "decoder", "none", "both"]] = "none",
+        use_size_factor_key: bool = False,
+        use_observed_lib_size: Tunable[bool] = True,
+        library_log_means: Optional[np.ndarray] = None,
+        library_log_vars: Optional[np.ndarray] = None,
+        var_activation: Tunable[Callable] = None,
+        extra_encoder_kwargs: Optional[dict] = None,
+        extra_decoder_kwargs: Optional[dict] = None,
+        # changed default: `encode_covariates`: `False` in scVI
+        # We want encoder to use covariates so it is set to True. encode covariates only used in encoder in scVI.
+        encode_covariates: Tunable[bool] = True,
+        # extra parameters:
+        deeply_inject_disentengled_latents: bool = False,
+        include_auxillary_loss: bool = True,
+        beta_kl_weight: float = 1.0,
+    ):
+        super().__init__(
+            n_input=n_input,
+            n_batch=n_batch,
+            n_labels=n_labels,
+            n_hidden=n_hidden,
+            n_latent=n_latent,
+            n_layers=n_layers,
+            n_continuous_cov=n_continuous_cov,
+            n_cats_per_cov=n_cats_per_cov,
+            dropout_rate=dropout_rate,
+            dispersion=dispersion,
+            log_variational=log_variational,
+            gene_likelihood=gene_likelihood,
+            latent_distribution=latent_distribution,
+            encode_covariates=encode_covariates,
+            deeply_inject_covariates=deeply_inject_covariates,
+            use_batch_norm=use_batch_norm,
+            use_layer_norm=use_layer_norm,
+            use_size_factor_key=use_size_factor_key,
+            use_observed_lib_size=use_observed_lib_size,
+            library_log_means=library_log_means,
+            library_log_vars=library_log_vars,
+            var_activation=var_activation,
+            extra_encoder_kwargs=extra_encoder_kwargs,
+            extra_decoder_kwargs=extra_decoder_kwargs,
+        )
 
         # Modify `DisentenglementTargetManager` to define reserved latents in loss calculations.
         self.n_total_reserved_latent = 0
@@ -47,6 +110,7 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
         if self.n_latent - self.n_total_reserved_latent < 1:
             raise ValueError("Not enough latent space variables to reserve for targets.")
         self.n_total_unreserved_latent = self.n_latent - self.n_total_reserved_latent
+        DisentanglementManager.configurations.reserved_latent_indices = list(range(self.n_total_reserved_latent))
         DisentanglementManager.configurations.unreserved_latent_indices = list(
             range(self.n_total_reserved_latent, self.n_latent)
         )  # If no target is defined, this list will contain all latent space variables.
@@ -54,6 +118,39 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
 
         self.auxillary_losses_keys: list[str] | None = None
         self.include_auxillary_loss = include_auxillary_loss
+        self.beta_kl_weight = beta_kl_weight
+        self.deeply_inject_covariates = deeply_inject_covariates
+        self.deeply_inject_disentengled_latents = deeply_inject_disentengled_latents
+        self.deeply_inject_disentengled_latents_activated = (
+            self.deeply_inject_disentengled_latents and len(DisentanglementManager.configurations) != 0
+        )
+
+        if self.deeply_inject_disentengled_latents_activated:
+            if not self.deeply_inject_covariates:
+                raise ValueError(
+                    "`deeply_inject_covariates` should be `True` if "
+                    "`deeply_inject_disentengled_latents` is set to `True`."
+                )
+            # redefine decoder
+            _extra_decoder_kwargs = extra_decoder_kwargs or {}
+            cat_list = [n_batch] + list([] if n_cats_per_cov is None else n_cats_per_cov)
+            use_batch_norm_decoder = use_batch_norm == "decoder" or use_batch_norm == "both"
+            use_layer_norm_decoder = use_layer_norm == "decoder" or use_layer_norm == "both"
+
+            n_input_decoder = n_latent - self.n_total_reserved_latent + n_continuous_cov
+            self.decoder = DecoderSCVIReservedLatentInjection(
+                n_input=n_input_decoder,
+                n_output=n_input,
+                n_reserved=self.n_total_reserved_latent,
+                n_cat_list=cat_list,
+                n_layers=n_layers,
+                n_hidden=n_hidden,
+                inject_covariates=deeply_inject_covariates,
+                use_batch_norm=use_batch_norm_decoder,
+                use_layer_norm=use_layer_norm_decoder,
+                scale_activation="softplus" if use_size_factor_key else "softmax",
+                **_extra_decoder_kwargs,
+            )
 
         # Remove the variable got from VAE initialization due to it is inherited from BaseMinifiedModeModuleClass.
         del self._minified_data_type
@@ -72,6 +169,79 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
     def _regular_inference(self, *args, **kwargs):
         raise NotImplementedError(minified_method_not_supported_message)
 
+    def _get_inference_input(
+        self,
+        tensors,
+    ):
+        batch_index = tensors[REGISTRY_KEYS.BATCH_KEY]
+
+        cont_key = REGISTRY_KEYS.CONT_COVS_KEY
+        cont_covs = tensors[cont_key] if cont_key in tensors.keys() else None
+
+        cat_key = REGISTRY_KEYS.CAT_COVS_KEY
+        cat_covs = tensors[cat_key] if cat_key in tensors.keys() else None
+
+        dist_key = REGISTRY_KEY_DISENTANGLEMENT_TARGETS
+        dist_covs = tensors[dist_key] if dist_key in tensors.keys() else None
+
+        if cat_covs is None and dist_covs is None:
+            stacked_cat_covs = None
+        elif cat_covs is None:
+            stacked_cat_covs = dist_covs
+        elif dist_covs is None:
+            stacked_cat_covs = cat_covs
+        else:
+            stacked_cat_covs = torch.hstack([dist_covs, cat_covs])
+
+        x = tensors[REGISTRY_KEYS.X_KEY]
+        input_dict = {
+            "x": x,
+            "batch_index": batch_index,
+            "cont_covs": cont_covs,
+            "cat_covs": stacked_cat_covs,
+        }
+
+        return input_dict
+
+    @auto_move_data
+    def inference(
+        self,
+        x,
+        batch_index,
+        cont_covs=None,
+        cat_covs=None,
+        n_samples=1,
+    ):
+        x_ = x
+        if self.use_observed_lib_size:
+            library = torch.log(x.sum(1)).unsqueeze(1)
+        if self.log_variational:
+            x_ = torch.log(1 + x_)
+
+        if cont_covs is not None and self.encode_covariates:
+            encoder_input = torch.cat((x_, cont_covs), dim=-1)
+        else:
+            encoder_input = x_
+        if cat_covs is not None and self.encode_covariates:
+            categorical_input = torch.split(cat_covs, 1, dim=1)
+        else:
+            categorical_input = ()
+        qz, z = self.z_encoder(encoder_input, batch_index, *categorical_input)
+        ql = None
+        if not self.use_observed_lib_size:
+            ql, library_encoded = self.l_encoder(encoder_input, batch_index, *categorical_input)
+            library = library_encoded
+
+        if n_samples > 1:
+            untran_z = qz.sample((n_samples,))
+            z = self.z_encoder.z_transformation(untran_z)
+            if self.use_observed_lib_size:
+                library = library.unsqueeze(0).expand((n_samples, library.size(0), library.size(1)))
+            else:
+                library = ql.sample((n_samples,))
+        outputs = {"z": z, "qz": qz, "ql": ql, "library": library}
+        return outputs
+
     @auto_move_data
     def generative(
         self,
@@ -87,45 +257,45 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
         if cont_covs is None:
             decoder_input = z
         elif z.dim() != cont_covs.dim():
-            decoder_input = torch.cat(
-                [z, cont_covs.unsqueeze(0).expand(z.size(0), -1, -1)], dim=-1
-            )
+            decoder_input = torch.cat([z, cont_covs.unsqueeze(0).expand(z.size(0), -1, -1)], dim=-1)
         else:
             decoder_input = torch.cat([z, cont_covs], dim=-1)
 
-        if cat_covs is not None:
-            ### TARDIS: TEMPORARY SOLUTION
-            raise NotImplementedError("Tardis temp solution didn't consider this case yet.")
-            categorical_input = torch.split(cat_covs, 1, dim=1)
-        else:
-            categorical_input = ()
-
         if transform_batch is not None:
             batch_index = torch.ones_like(batch_index) * transform_batch
-            ### TARDIS: TEMPORARY SOLUTION
-            batch_index = torch.zeros_like(batch_index)
 
         if not self.use_size_factor_key:
             size_factor = library
 
-        px_scale, px_r, px_rate, px_dropout = self.decoder(
-            self.dispersion,
-            decoder_input,
-            size_factor,
-            ### TARDIS: TEMPORARY SOLUTION
-            # batch_index,
-            torch.zeros_like(batch_index),
-            *categorical_input,
-            y,
-        )
-        
+        if cat_covs is not None:
+            categorical_input = torch.split(cat_covs, 1, dim=1)
+        else:
+            categorical_input = ()
+
+        if self.deeply_inject_disentengled_latents_activated:
+            r = self.n_total_reserved_latent
+            # as the cont_covs are added at the end
+            decoder_input = decoder_input[:, r:]
+            reserved_latent_injection = decoder_input[:, :r].clone().detach()  # TODO: detach or not!
+
+            px_scale, px_r, px_rate, px_dropout = self.decoder(
+                self.dispersion,
+                decoder_input,
+                size_factor,
+                batch_index,
+                *categorical_input,
+                y,
+                reserved_latent_injection=reserved_latent_injection,
+            )
+        else:
+            px_scale, px_r, px_rate, px_dropout = self.decoder(
+                self.dispersion, decoder_input, size_factor, batch_index, *categorical_input, y
+            )
+
         if self.dispersion == "gene-label":
-            px_r = F.linear(
-                one_hot(y, self.n_labels), self.px_r
-            )  # px_r gets transposed - last dimension is nb genes
+            px_r = F.linear(one_hot(y, self.n_labels), self.px_r)  # px_r gets transposed - last dimension is nb genes
         elif self.dispersion == "gene-batch":
             px_r = F.linear(one_hot(batch_index, self.n_batch), self.px_r)
-            raise NotImplementedError("Tardis temp solution didn't consider this case yet.")
         elif self.dispersion == "gene":
             px_r = self.px_r
 
@@ -159,71 +329,6 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
             "pz": pz,
         }
 
-    def _get_inference_input(
-        self,
-        tensors,
-    ):
-        batch_index = tensors[REGISTRY_KEYS.BATCH_KEY]
-
-        cont_key = REGISTRY_KEYS.CONT_COVS_KEY
-        cont_covs = tensors[cont_key] if cont_key in tensors.keys() else None
-
-        cat_key = REGISTRY_KEYS.CAT_COVS_KEY
-        cat_covs = tensors[cat_key] if cat_key in tensors.keys() else None
-
-        x = tensors[REGISTRY_KEYS.X_KEY]
-        input_dict = {
-            "x": x,
-            "batch_index": batch_index,
-            "cont_covs": cont_covs,
-            "cat_covs": cat_covs,
-        }
-
-        return input_dict
-
-    @auto_move_data
-    def inference(
-        self,
-        x,
-        batch_index,
-        cont_covs=None,
-        cat_covs=None,
-        n_samples=1,
-    ):
-        """High level inference method.
-
-        Runs the inference (encoder) model.
-        """
-        x_ = x
-        if self.use_observed_lib_size:
-            library = torch.log(x.sum(1)).unsqueeze(1)
-        if self.log_variational:
-            x_ = torch.log(1 + x_)
-
-        if cont_covs is not None and self.encode_covariates:
-            encoder_input = torch.cat((x_, cont_covs), dim=-1)
-        else:
-            encoder_input = x_
-        if cat_covs is not None and self.encode_covariates:
-            categorical_input = torch.split(cat_covs, 1, dim=1)
-        else:
-            categorical_input = ()
-        qz, z = self.z_encoder(encoder_input, batch_index, *categorical_input)
-        ql = None
-        if not self.use_observed_lib_size:
-            ql, library_encoded = self.l_encoder(encoder_input, batch_index, *categorical_input)
-            library = library_encoded
-
-        if n_samples > 1:
-            untran_z = qz.sample((n_samples,))
-            z = self.z_encoder.z_transformation(untran_z)
-            if self.use_observed_lib_size:
-                library = library.unsqueeze(0).expand((n_samples, library.size(0), library.size(1)))
-            else:
-                library = ql.sample((n_samples,))
-        outputs = {"z": z, "qz": qz, "ql": ql, "library": library}
-        return outputs
-
     def loss(
         self,
         tensors,
@@ -247,10 +352,9 @@ class MyModule(VAE, AuxillaryLossesMixin, ModuleMetricsMixin):
         kl_local_no_warmup = kl_divergence_l
 
         # Note that `kl_weight` is determined dynamically depending on `n_epochs_kl_warmup` parameter.
-        weighted_kl_local = kl_weight * kl_local_for_warmup + kl_local_no_warmup
+        weighted_kl_local = kl_weight * kl_local_for_warmup * self.beta_kl_weight + kl_local_no_warmup
 
         # `weighted_auxillary_losses` is also determined dynamically, depending on `warmup_epoch_range` parameter.
-
         if REGISTRY_KEY_DISENTANGLEMENT_TARGETS_TENSORS in tensors:
             # Then we are using the MyAnnDataLoader, which includes the counteractive minibatches. This happens
             # when the model is in training phase. Have a look at the `_data_loader_cls` in Model.
