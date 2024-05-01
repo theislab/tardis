@@ -33,4 +33,6 @@ EOF
 
     # Submit the job
     sbatch $SCRIPT_NAME
+
+sleep 1
 done
