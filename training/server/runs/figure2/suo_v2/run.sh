@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Path to the Python files
-DIRECTORY="/home/icb/kemal.inecik/work/codes/tardis/training/server/runs/figure2/suo"
+DIRECTORY="/home/icb/kemal.inecik/work/codes/tardis/training/server/runs/figure2/suo_v2"
 
 # Activate the Python environment
 source activate tardis_env
