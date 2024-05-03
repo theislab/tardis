@@ -12,10 +12,8 @@ from scvi import REGISTRY_KEYS, settings
 from scvi._types import Tunable
 from scvi.distributions import NegativeBinomial, Poisson, ZeroInflatedNegativeBinomial
 from scvi.module import VAE
-from scvi.module.base import BaseMinifiedModeModuleClass
-from scvi.module.base import LossOutput, auto_move_data
-from scvi.nn import DecoderSCVI, Encoder
-from scvi.nn import one_hot
+from scvi.module.base import BaseMinifiedModeModuleClass, LossOutput, auto_move_data
+from scvi.nn import DecoderSCVI, Encoder, one_hot
 from torch.distributions import Normal
 from torch.distributions import kl_divergence as kl
 
@@ -89,8 +87,7 @@ class MyModule(VAE, BaseMinifiedModeModuleClass, AuxillaryLossesMixin, ModuleMet
         if not self.use_observed_lib_size:
             if library_log_means is None or library_log_vars is None:
                 raise ValueError(
-                    "If not using observed_lib_size, "
-                    "must provide library_log_means and library_log_vars."
+                    "If not using observed_lib_size, " "must provide library_log_means and library_log_vars."
                 )
 
             self.register_buffer("library_log_means", torch.from_numpy(library_log_means).float())
@@ -120,7 +117,9 @@ class MyModule(VAE, BaseMinifiedModeModuleClass, AuxillaryLossesMixin, ModuleMet
         # latent space representation
         n_input_encoder = n_input + n_continuous_cov * encode_covariates
         cat_list = [n_batch] + list([] if n_cats_per_cov is None else n_cats_per_cov)
-        encoder_cat_list = cat_list + list([] if n_cats_per_disentenglement_covariates is None else n_cats_per_disentenglement_covariates)
+        encoder_cat_list = cat_list + list(
+            [] if n_cats_per_disentenglement_covariates is None else n_cats_per_disentenglement_covariates
+        )
         encoder_cat_list = encoder_cat_list if encode_covariates else None
         _extra_encoder_kwargs = extra_encoder_kwargs or {}
         self.z_encoder = Encoder(

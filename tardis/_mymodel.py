@@ -73,7 +73,7 @@ class MyModel(
             if REGISTRY_KEY_DISENTANGLEMENT_TARGETS in self.adata_manager.data_registry
             else None
         )
-        
+
         n_batch = self.summary_stats.n_batch
         use_size_factor_key = REGISTRY_KEYS.SIZE_FACTOR_KEY in self.adata_manager.data_registry
         library_log_means, library_log_vars = None, None

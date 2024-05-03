@@ -10,7 +10,12 @@ from scipy.sparse import spmatrix
 from scvi import REGISTRY_KEYS, settings
 
 from ._disentanglementmanager import DisentanglementManager
-from ._myconstants import NEGATIVE_EXAMPLE_KEY, POSITIVE_EXAMPLE_KEY, REGISTRY_KEY_DISENTANGLEMENT_TARGETS, REGISTRY_KEY_METRICS_COVARIATES_HELPER
+from ._myconstants import (
+    NEGATIVE_EXAMPLE_KEY,
+    POSITIVE_EXAMPLE_KEY,
+    REGISTRY_KEY_DISENTANGLEMENT_TARGETS,
+    REGISTRY_KEY_METRICS_COVARIATES_HELPER,
+)
 from ._mymonitor import TrainingStepLogger
 
 
