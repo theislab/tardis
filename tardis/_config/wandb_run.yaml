@@ -2,7 +2,7 @@
 
 wandblogger_kwargs:
   entity: inecik-academic
-  project: tardis_figures
+  project: tardis_conference
   name: null # wandb should assign a random one
   save_dir:
     relative_to: wandb_parent_directory

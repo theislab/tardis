@@ -341,18 +341,14 @@ class MyModule(VAE, BaseMinifiedModeModuleClass, AuxillaryLossesMixin, ModuleMet
 
         if self.deeply_inject_disentengled_latents_activated:
             r = self.n_total_reserved_latent
-            # as the cont_covs are added at the end
-            decoder_input = decoder_input[:, r:]
-            reserved_latent_injection = decoder_input[:, :r].clone().detach()  # TODO: detach or not!
-
             px_scale, px_r, px_rate, px_dropout = self.decoder(
                 self.dispersion,
-                decoder_input,
+                decoder_input[:, r:],  # as the cont_covs are added at the end
                 size_factor,
                 batch_index,
                 *categorical_input,
                 y,
-                reserved_latent_injection=reserved_latent_injection,
+                reserved_latent_injection=decoder_input[:, :r].detach()  # TODO: detach or not!
             )
         else:
             px_scale, px_r, px_rate, px_dropout = self.decoder(

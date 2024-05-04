@@ -154,3 +154,6 @@ tardis/__DEBUG*
 !.vscode/*.code-snippets
 
 *.out
+**/*slurm_job.sh
+**/slurm_job_*.sh
+
