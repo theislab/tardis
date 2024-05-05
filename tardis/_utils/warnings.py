@@ -7,6 +7,17 @@ from contextlib import contextmanager
 
 
 @contextmanager
+def suppress_stdout():
+    original_stdout = sys.stdout
+    sys.stdout = open(os.devnull, 'w')
+    try:
+        yield
+    finally:
+        sys.stdout.close()
+        sys.stdout = original_stdout
+        
+
+@contextmanager
 def ignore_predetermined_warnings():
     with warnings.catch_warnings():
         # scvi
