@@ -31,7 +31,7 @@ do
 #SBATCH -c 32
 #SBATCH --mem=40G
 #SBATCH --nice=0
-#SBATCH -t 9:59:00
+#SBATCH -t 23:59:00
 
 source activate tardis_env
 jupyter nbconvert --execute --inplace --debug $file
