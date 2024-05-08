@@ -1,0 +1,6 @@
+https://cpa-tools.readthedocs.io/en/latest/installation.html
+
+conda create -n invae_env python=3.9
+pip install scanpy==1.9.3 torch==2.0.1 tensorboard==2.13.0 anndata==0.8.0 invae ipykernel
+
+python -m ipykernel install --user --name=invae_env

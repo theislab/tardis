@@ -16,6 +16,7 @@ from sklearn.neighbors import kneighbors_graph
 import numpy as np
 import scanpy as sc
 import pandas as pd
+import joblib
 import numpy as np
 import scipy.stats
 
@@ -53,7 +54,7 @@ model = FinVAE(
     layer = None,
     inv_covar_keys = inv_covar_keys,
     spur_covar_keys = spur_covar_keys,
-    device="cuda",
+    device="cpu",
 )
 
 with warnings.catch_warnings():

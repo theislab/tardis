@@ -183,6 +183,8 @@ class MetricsMixin:
         aggregate_method_datapoints: Literal["variance_weighted", "uniform_average", "flatten", "mean"] = "mean",
         verbose: bool = False,
         debug: bool = False,
+        give_std: bool = False,
+        drop_last: bool = False
     ) -> float:
         """Get reconstruction performance by R2 score."""
         adata = self._validate_anndata(adata if adata is not None else self.adata_manager.adata)
@@ -190,7 +192,7 @@ class MetricsMixin:
         batch_size = (
             (adata.n_obs if indices is None else min(adata.n_obs, len(indices))) if batch_size is None else batch_size
         )
-        scdl = self._make_data_loader(adata=adata, indices=indices, batch_size=batch_size)
+        scdl = self._make_data_loader(adata=adata, indices=indices, batch_size=batch_size, drop_last=drop_last)
         values = []
 
         if top_n_differentially_expressed_genes < 0:
@@ -247,7 +249,10 @@ class MetricsMixin:
             if debug:
                 return true, pred, r2
 
-        return np.mean(values)
+        if not give_std:
+            return np.mean(values)
+        else:
+            return np.mean(values), np.std(values)
 
     def _get_training_data_indices(self):
 

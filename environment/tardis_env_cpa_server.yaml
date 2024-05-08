@@ -1,8 +1,0 @@
-https://cpa-tools.readthedocs.io/en/latest/installation.html
-
-conda create -n cpa python=3.9
-pip install torch==1.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
-
-pip install git+https://github.com/theislab/cpa
-pip install scanpy
-pip install ipykernel

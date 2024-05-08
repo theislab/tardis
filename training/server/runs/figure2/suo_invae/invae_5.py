@@ -14,6 +14,7 @@ from pathlib import Path
 import networkx as nx
 from sklearn.neighbors import kneighbors_graph
 import numpy as np
+import joblib
 import scanpy as sc
 import pandas as pd
 import numpy as np
@@ -53,7 +54,7 @@ model = FinVAE(
     layer = None,
     inv_covar_keys = inv_covar_keys,
     spur_covar_keys = spur_covar_keys,
-    device="cuda",
+    device="cpu",
     latent_dim_inv = 20, 
     latent_dim_spur = 5,
 )

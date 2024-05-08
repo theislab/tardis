@@ -1,0 +1,106 @@
+# tardis_env Environment
+
+# This is after mamba installation
+# pip install jaxlib==0.4.20
+
+name: cpa_env
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.10
+  - pip
+  - jupyterlab>4.1 # jupyterlab
+  - notebook # jupyterlab
+  - markdown # jupyterlab
+  - nodejs # jupyterlab
+  - jupyterlab_widgets # jupyterlab
+  - ipywidgets # jupyterlab
+  - python-lsp-server # jupyterlab
+  - jupyterlab-lsp # jupyterlab
+  - jupyterlab_code_formatter # jupyterlab
+  - isort
+  - black
+  - flake8
+  - pyupgrade
+  - pre-commit-hooks
+  - pre-commit
+  - cython
+  - pandas=1.5.3
+  - numpy=1.24.4
+  - future>=0.16.0
+  - tqdm
+  - sparse
+  - scipy=1.12.0
+  - networkx
+  - matplotlib>=3.7
+  - mscorefonts
+  - seaborn>0.13
+  - hiplot
+  - dill
+  - memory_profiler
+  - scikit-learn==1.1.3
+  - scikit-sparse
+  - scikit-plot
+  - scikit-learn-intelex # Should be commented out for MAC Silicon
+  - requests
+  - typing_extensions
+  - pymysql
+  - pytables
+  - pyyaml
+  - ipython
+  - hdf5
+  - h5py
+  - hdbscan
+  - loompy
+  - anytree
+  - igraph>=0.10,<0.12
+  - python-igraph
+  - leidenalg
+  - python-louvain
+  - rclone
+  - adjustText
+  - jsonpickle
+  - wandb
+  - numba
+  - polars
+  - gputil
+  - tabulate
+  - upsetplot
+  - python-levenshtein
+  - arrow
+  - pyarrow
+  - pytoml
+  - shapely
+  - colorcet
+  - joblib
+  - statsmodels>=0.12
+  - cycler
+  - jax<=0.4.23
+  - jaxlib
+  - zarr
+  - colorlover
+  - pandas-stubs
+  - types-pyyaml
+  - lightning
+  - pytorch-lightning
+  - torchmetrics
+  - pytorch::pytorch=2.0.1
+  - pytorch::torchvision
+  - pytorch::torchaudio
+  - pytorch::captum
+  - pytorch::pytorch-cuda # Should be commented out for MAC Silicon
+  - cuda-version # Should be commented out for MAC Silicon
+  - nvidia::cuda-nvcc # Should be commented out for MAC Silicon
+  - nvidia::cuda-nvrtc # Should be commented out for MAC Silicon
+  - nvidia::cuda-cudart # Should be commented out for MAC Silicon
+  - cudatoolkit # Should be commented out for MAC Silicon
+  - cutensor # Should be commented out for MAC Silicon
+  - cusparselt # Should be commented out for MAC Silicon
+  - cudnn # Should be commented out for MAC Silicon
+  - anndata
+  - scanpy
+  - pip:
+      - cpa-tools
+      - scanpy

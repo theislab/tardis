@@ -1,0 +1,1 @@
+{"pert_encoder": {"<PAD>": 0, "11": 1, "15": 2, "18": 3, "21": 4}, "covars_encoder": {"integration_donor": {"S1_Miller_et_al": 0, "S2_Miller_et_al": 1, "S3_Miller_et_al": 2, "S4_Miller_et_al": 3, "S5_Miller_et_al": 4, "S6_Miller_et_al": 5, "S7_Miller_et_al": 6, "S8_Miller_et_al": 7}}, "pert_smiles_map": null}

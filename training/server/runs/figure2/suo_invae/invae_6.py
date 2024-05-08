@@ -13,6 +13,7 @@ import torch
 from pathlib import Path
 import networkx as nx
 from sklearn.neighbors import kneighbors_graph
+import joblib
 import numpy as np
 import scanpy as sc
 import pandas as pd
@@ -53,7 +54,7 @@ model = FinVAE(
     layer = None,
     inv_covar_keys = inv_covar_keys,
     spur_covar_keys = spur_covar_keys,
-    device="cuda",
+    device="cpu",
 )
 
 with warnings.catch_warnings():

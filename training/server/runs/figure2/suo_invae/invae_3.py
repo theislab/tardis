@@ -17,6 +17,7 @@ import numpy as np
 import scanpy as sc
 import pandas as pd
 import numpy as np
+import joblib
 import scipy.stats
 
 adata_file_path = os.path.join("/home/icb/kemal.inecik/lustre_workspace/tardis_data/processed", "dataset_complete_Suo.h5ad")
@@ -53,7 +54,7 @@ model = FinVAE(
     layer = None,
     inv_covar_keys = inv_covar_keys,
     spur_covar_keys = spur_covar_keys,
-    device="cuda",
+    device="cpu",
     latent_dim_inv = 20, 
     latent_dim_spur = 5,
 )

@@ -4,7 +4,7 @@
 DIRECTORY="/home/icb/kemal.inecik/work/codes/tardis/training/server/runs/figure2/suo_invae"
 
 # Activate the Python environment
-source activate cpa
+source activate invae_env
 
 # Loop over all Python files in the directory
 for file in $DIRECTORY/*.py
@@ -17,16 +17,15 @@ do
     cat << EOF > $SCRIPT_NAME
 #!/bin/bash
 
-#SBATCH -J tardis_run
-#SBATCH -p gpu_p
-#SBATCH --qos=gpu_normal
-#SBATCH --gres=gpu:1
-#SBATCH -c 6
-#SBATCH --mem=159G
+#SBATCH -J invae_suo
+#SBATCH -p cpu_p
+#SBATCH --qos=cpu_normal
+#SBATCH -c 32
+#SBATCH --mem=100G
 #SBATCH --nice=0
-#SBATCH -t 1-23:50:00
+#SBATCH -t 1-23:59:00
 
-source activate cpa
+source activate invae_env
 python $file
 
 EOF

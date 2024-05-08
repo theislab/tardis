@@ -1,0 +1,1 @@
+{"pert_encoder": {"<PAD>": 0, "0": 1, "12": 2, "2": 3, "24": 4, "30": 5, "36": 6}, "covars_encoder": {"zone": {"Pericentral": 0, "Periportal": 1}, "status_control": {"Control": 0, "Infected": 1, "Uninfected": 2}}, "pert_smiles_map": null}
