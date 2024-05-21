@@ -157,3 +157,4 @@ tardis/__DEBUG*
 **/*slurm_job.sh
 **/slurm_job_*.sh
 
+**/training/server/figures/*.pdf

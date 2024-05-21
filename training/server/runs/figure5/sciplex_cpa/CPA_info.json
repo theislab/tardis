@@ -1,0 +1,1 @@
+{"pert_encoder": {"<PAD>": 0, "Vehicle": 1, "BMS": 2, "Dex": 3, "Nutlin": 4, "SAHA": 5}, "covars_encoder": {"cell_type": {"A549": 0}}, "pert_smiles_map": null}
