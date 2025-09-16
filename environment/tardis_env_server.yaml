@@ -20,6 +20,8 @@ dependencies:
   - isort
   - black
   - flake8
+  - gdown
+  - loguru
   - pyupgrade
   - pre-commit-hooks
   - pre-commit
